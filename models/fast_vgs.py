@@ -23,6 +23,8 @@ import torch
 from torch import nn
 from .w2v2_model import  Wav2Vec2Model_cls
 from .utils import w2v2_loss, Margin_InfoNCE_loss, VisualFeatEncoder, BertLayer, LXMERTXLayer
+from vicreg import VICReg
+from barlow_twins import BarlowTwins
 import logging
 logger = logging.getLogger(__name__)
 
@@ -189,6 +191,10 @@ class DualEncoder(nn.Module):
         parser.add_argument("--fb_w2v2_weights_fn", type=str, help="the path of w2v2 small model trained by FAIR", default=None)
         parser.add_argument("--margin", type=float, default=1.0)
         parser.add_argument("--topk", type=float, default=100)
+        parser.add_argument("--projector_mlp", type=str, default="1536-1536", help="Size and number of layers of the MLP expander head")
+        parser.add_argument("--sim_coeff", type=float, default=25.0, help="Invariance regularization loss coefficient")
+        parser.add_argument("--std_coeff", type=float, default=25.0, help="Variance regularization loss coefficient")
+        parser.add_argument("--cov_coeff", type=float, default=1.0, help="Covariance regularization loss coefficient")
     def __init__(self, args):
         super().__init__()
         self.args = args
@@ -202,15 +208,27 @@ class DualEncoder(nn.Module):
         
         self.conv1_trm1_trm3 = Wav2Vec2Model_cls(args)
         self.conv2 = ResDavenet()
-        self.audio_cls_token_proj_coarse = nn.Sequential(nn.Linear(self.args.hidden_size, self.args.hidden_size*2), nn.GELU(), nn.Linear(self.args.hidden_size*2, self.args.hidden_size))
-        self.audio_cls_token_proj_pre = nn.Sequential(nn.Linear(self.args.hidden_size, self.args.hidden_size*2), nn.GELU(), nn.Linear(self.args.hidden_size*2, self.args.hidden_size))
+        self.audio_cls_token_proj_coarse = nn.Sequential(
+            nn.Linear(self.args.hidden_size, self.args.hidden_size*2), 
+            nn.GELU(), 
+            nn.Linear(self.args.hidden_size*2, self.args.hidden_size)
+        )
+        self.audio_cls_token_proj_pre = nn.Sequential(
+            nn.Linear(self.args.hidden_size, self.args.hidden_size*2), 
+            nn.GELU(), 
+            nn.Linear(self.args.hidden_size*2, self.args.hidden_size)
+        )
         self.trm2 = BertLayer(args)
         self.trm2_proj = nn.Linear(self.args.hidden_size, self.args.hidden_size)
 
         self.visn_fc = VisualFeatEncoder(args)
         self.visual_cls_token = torch.nn.Parameter(torch.randn((1, 1, args.hidden_size)), requires_grad=True)
         self.trm = nn.ModuleList([BertLayer(args) for _ in range(args.trm_layers)])
-        self.visual_cls_token_proj_coarse = nn.Sequential(nn.Linear(self.args.hidden_size, self.args.hidden_size*2), nn.GELU(), nn.Linear(self.args.hidden_size*2, self.args.hidden_size))
+        self.visual_cls_token_proj_coarse = nn.Sequential(
+            nn.Linear(self.args.hidden_size, self.args.hidden_size*2), 
+            nn.GELU(), 
+            nn.Linear(self.args.hidden_size*2, self.args.hidden_size)
+        )
 
         self.apply(self.init_weights)
 
@@ -353,9 +371,12 @@ class CrossEncoder(nn.Module):
             audio_feats_square, visual_feats_square = layer_module(
                 audio_feats_square, extended_audio_attention_mask_square, visual_feats_square, extended_visual_attention_mask_square
             )
-        cls_token = torch.cat([audio_feats_square[:,0],visual_feats_square[:,0]],dim=-1)
-        cross_relationship_score_square = self.fc(cls_token)
-        return cross_relationship_score_square
+        if self.args.solo_loss:
+            return audio_feats_square[:,0], visual_feats_square[:,0]
+        else:
+            cls_token = torch.cat([audio_feats_square[:,0], visual_feats_square[:,0]], dim=-1)
+            cross_relationship_score_square = self.fc(cls_token)
+            return cross_relationship_score_square
     def carefully_load_state_dict(self, states):
         """
         1) Take care of DataParallel/nn.Module state_dict

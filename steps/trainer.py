@@ -30,7 +30,7 @@ class Trainer:
         parser.add_argument("--n_val_steps", type=int)
         parser.add_argument("--lr", type=float, default=0.0001)
         parser.add_argument("--warmup_fraction", type=float, default=0.1)
-    
+        parser.add_argument("--solo_loss", type=str, default=None)
     def __init__(self, args):
         self.start_time = time.time()
         self.args = args
@@ -51,7 +51,14 @@ class Trainer:
         self.scheduler = self._setup_scheduler()
         self.criterion = fast_vgs.Margin_InfoNCE_loss
         logger.info(f"batch size: {self.args.batch_size}")
-    
+        
+        if self.args.solo_loss == 'VICReg':
+            self.solo_module_coarse = fast_vgs.VICReg(self.args)
+            self.solo_module_fine = fast_vgs.VICReg(self.args)
+        elif self.args.solo_loss == 'BarlowTwins':
+            self.solo_module_coarse = fast_vgs.BarlowTwins(self.args)
+            self.solo_module_fine = fast_vgs.BarlowTwins(self.args)
+            
     def forward(self, batch):
         audio_feats, audio_cls, extended_audio_attention_mask, visual_feats, visual_cls, losses = self.dual_encoder(audio_feats = batch['audio'], attention_mask = batch['audio_attention_mask'], visual_feats = batch['visual_feats'], visual_pos = batch['visual_pos'], target_list = batch['label'])
         coarse_cross_relationship_score_matrix = visual_cls @ audio_cls.transpose(0,1)
@@ -65,6 +72,21 @@ class Trainer:
         losses["fine_matching_loss"] = fast_vgs.Margin_InfoNCE_loss(cross_relationship_score_matrix, margin=self.args.margin, img_id = batch['img_id'])
         return losses
 
+    def forward_solo(self, batch):
+        audio_feats, audio_cls, extended_audio_attention_mask, visual_feats, visual_cls, losses = self.dual_encoder(audio_feats = batch['audio'], attention_mask = batch['audio_attention_mask'], visual_feats = batch['visual_feats'], visual_pos = batch['visual_pos'], target_list = batch['label'])
+        losses['coarse_matching_loss'] = self.solo_module_coarse(audio_cls, visual_cls)
+        
+        if self.coarse_matching_weight == 0:
+            losses["fine_matching_loss"] = 0
+        else:
+            B = visual_feats.shape[0]
+            visual_feats_square = visual_feats.repeat(B,1,1)
+            audio_feats_square = audio_feats.repeat_interleave(B, dim=0)
+            extended_audio_attention_mask_square = extended_audio_attention_mask.repeat_interleave(B, dim=0)
+            audio_cls, visual_cls = self.cross_encoder(audio_feats_square, extended_audio_attention_mask_square, visual_feats_square)
+            losses["fine_matching_loss"] = self.solo_module_fine(audio_cls, visual_cls)
+        return losses
+    
     def train(self):
         flag = True
         step_per_epoch = int(self.train_data_length/self.args.batch_size)
