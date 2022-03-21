@@ -23,8 +23,8 @@ import torch
 from torch import nn
 from .w2v2_model import  Wav2Vec2Model_cls
 from .utils import w2v2_loss, Margin_InfoNCE_loss, VisualFeatEncoder, BertLayer, LXMERTXLayer
-from vicreg import VICReg
-from barlow_twins import BarlowTwins
+from .vicreg import VICReg
+from .barlow_twins import BarlowTwins
 import logging
 logger = logging.getLogger(__name__)
 

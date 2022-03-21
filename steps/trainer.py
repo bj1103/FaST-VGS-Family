@@ -151,7 +151,7 @@ class Trainer:
                     log_out['epoch'] = f"{self.progress['epoch']}/{self.args.n_epochs}"
                     log_out['cur_step/steps_per_epoch'] = f"{cur_step}/{step_per_epoch}"
                     log_out['num_updates'] = self.progress['num_updates']
-                    log_out['lr'] = f"{cur_lr:.7f}"
+                    log_out['lr'] = f"{cur_lr:.15f}"
                     for key in self.meters:
                         if self.meters[key].val != 0 or self.meters[key].avg != 0:
                             log_out[key] = f"{self.meters[key].val:.4f} ({self.meters[key].avg:.4f})" if isinstance(self.meters[key].val, float) else f"{self.meters[key].val}"
