@@ -3,7 +3,6 @@ import numpy as np
 import json
 # import cv2
 import csv
-from tqdm import tqdm
 
 import h5py
 from pathlib import Path
@@ -123,8 +122,8 @@ if __name__ == "__main__":
     parser.add_argument("--dataset", type=str, choices=['coco', 'places', 'flickr8k'])
     args = parser.parse_args()
     if args.dataset == 'coco':
-        train_audio_dataset_json_file="/work/vjsalt22/poheng/coco/SpokenCOCO/SpokenCOCO_train_unrolled.json"
-        val_audio_dataset_json_file = "/work/vjsalt22/poheng/coco/SpokenCOCO/SpokenCOCO_val_unrolled.json"
+        train_audio_dataset_json_file="/work/vjsalt22/poheng/coco/SpokenCOCO/SpokenCOCO_train_unrolled_karpathy.json"
+        val_audio_dataset_json_file = "/work/vjsalt22/poheng/coco/SpokenCOCO/SpokenCOCO_val_unrolled_karpathy.json"
         train_img_dataset_tsv_file = "/work/vjsalt22/dataset/coco/mscoco_imgfeat/train2014_obj36.tsv"
         val_img_dataset_tsv_file ="/work/vjsalt22/dataset/coco/mscoco_imgfeat/val2014_obj36.tsv"
 
