@@ -63,9 +63,7 @@ class Trainer:
         audio_feats, audio_cls, extended_audio_attention_mask, visual_feats, visual_cls, losses = self.dual_encoder(audio_feats = batch['audio'], attention_mask = batch['audio_attention_mask'], visual_feats = batch['visual_feats'], visual_pos = batch['visual_pos'], target_list = batch['label'])
         coarse_cross_relationship_score_matrix = visual_cls @ audio_cls.transpose(0,1)
         losses['coarse_matching_loss'] = fast_vgs.Margin_InfoNCE_loss(coarse_cross_relationship_score_matrix, margin=self.args.margin, img_id = batch['img_id'])
-        if self.args.fine_matching_weight == 0:
-             losses["fine_matching_loss"] = 0
-        else:
+        if self.args.fine_matching_weight != 0:
             B = visual_feats.shape[0]
             visual_feats_square = visual_feats.repeat(B,1,1)
             audio_feats_square = audio_feats.repeat_interleave(B, dim=0)
@@ -79,9 +77,7 @@ class Trainer:
         audio_feats, audio_cls, extended_audio_attention_mask, visual_feats, visual_cls, losses = self.dual_encoder(audio_feats = batch['audio'], attention_mask = batch['audio_attention_mask'], visual_feats = batch['visual_feats'], visual_pos = batch['visual_pos'], target_list = batch['label'])
         losses['coarse_matching_loss'] = self.solo_module_coarse(audio_cls, visual_cls)
         
-        if self.args.fine_matching_weight == 0:
-            losses["fine_matching_loss"] = 0
-        else:
+        if self.args.fine_matching_weight != 0:
             B = visual_feats.shape[0]
             visual_feats_square = visual_feats.repeat(B,1,1)
             audio_feats_square = audio_feats.repeat_interleave(B, dim=0)
@@ -565,7 +561,9 @@ class Trainer:
         pass
 
     def weight_loss(self, losses):
-        weighted_loss = losses['coarse_matching_loss'] * self.args.coarse_matching_weight + losses['fine_matching_loss'] * self.args.fine_matching_weight
+        weighted_loss = losses['coarse_matching_loss'] * self.args.coarse_matching_weight
+        if 'fine_matching_loss' in losses:
+            weighted_loss += losses['fine_matching_loss'] * self.args.fine_matching_weight
         if 'caption_w2v2_loss' in losses:
             weighted_loss += losses['caption_w2v2_loss'].mean() * self.args.caption_w2v2_weight
         if 'libri_w2v2_loss' in losses:
