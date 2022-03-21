@@ -118,7 +118,7 @@ class Trainer:
                         "audio": batch['audio'].to(self.device),
                         "audio_attention_mask": batch['audio_attention_mask'].to(self.device),
                         "img_id": batch['img_id'],
-                        "label": batch['label']
+                        "label": None
                         }
 
                 losses = self.forward(cur_batch)
