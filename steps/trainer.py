@@ -63,7 +63,7 @@ class Trainer:
         audio_feats, audio_cls, extended_audio_attention_mask, visual_feats, visual_cls, losses = self.dual_encoder(audio_feats = batch['audio'], attention_mask = batch['audio_attention_mask'], visual_feats = batch['visual_feats'], visual_pos = batch['visual_pos'], target_list = batch['label'])
         coarse_cross_relationship_score_matrix = visual_cls @ audio_cls.transpose(0,1)
         losses['coarse_matching_loss'] = fast_vgs.Margin_InfoNCE_loss(coarse_cross_relationship_score_matrix, margin=self.args.margin, img_id = batch['img_id'])
-        if self.fine_matching_weight == 0:
+        if self.args.fine_matching_weight == 0:
              losses["fine_matching_loss"] = 0
         else:
             B = visual_feats.shape[0]
@@ -79,7 +79,7 @@ class Trainer:
         audio_feats, audio_cls, extended_audio_attention_mask, visual_feats, visual_cls, losses = self.dual_encoder(audio_feats = batch['audio'], attention_mask = batch['audio_attention_mask'], visual_feats = batch['visual_feats'], visual_pos = batch['visual_pos'], target_list = batch['label'])
         losses['coarse_matching_loss'] = self.solo_module_coarse(audio_cls, visual_cls)
         
-        if self.fine_matching_weight == 0:
+        if self.args.fine_matching_weight == 0:
             losses["fine_matching_loss"] = 0
         else:
             B = visual_feats.shape[0]
@@ -368,7 +368,7 @@ class Trainer:
             logger.info('Audio R@10 {A_r10:.3f} Image R@10 {I_r10:.3f} Average R@10 {r10_ave:.3f} over {N:d} validation pairs'.format(A_r10=recalls['A_r10'], I_r10=recalls['I_r10'], r10_ave=(recalls['A_r10']+recalls['I_r10'])/2, N=N_examples))
             logger.info('Audio R@5 {A_r5:.3f} Image R@5 {I_r5:.3f} Average R@5 {r5_ave:.3f} over {N:d} validation pairs'.format(A_r5=recalls['A_r5'], I_r5=recalls['I_r5'], r5_ave=(recalls['A_r5']+recalls['I_r5'])/2, N=N_examples))
             logger.info('Audio R@1 {A_r1:.3f} Image R@1 {I_r1:.3f} Average R@1 {ave_r1:.3f} over {N:d} validation pairs'.format(A_r1=recalls['A_r1'], I_r1=recalls['I_r1'], ave_r1=(recalls['A_r1']+recalls['I_r1'])/2,  N=N_examples))
-            if self.fine_matching_weight != 0:
+            if self.args.fine_matching_weight != 0:
                 if self.args.coarse_to_fine_retrieve:
                     visual_indices, audio_indices = coarse_retrieve_one_to_many(coarse_cross_relationship_score_matrix.transpose(0,1), topk=self.args.topk) # transpose to have [audio_len, visual_len]
                     B = len(visual_indices)
