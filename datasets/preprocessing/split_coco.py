@@ -3,14 +3,17 @@ import json
 TRAIN=0
 VAL=1
 TEST=2
+RESTVAL=3
 split_map = {
-    'restval' : TRAIN,
+    'train' : TRAIN,
     'val' : VAL,
-    'teat' : TEST
+    'test' : TEST,
+    'restval' : RESTVAL
 }
-coco_root="put the coco root here"
-output_root=""
-split_json_fn=""
+coco_root="/work/vjsalt22/dataset/coco"
+output_root="/work/vjsalt22/poheng/coco"
+split_json_fn="/work/vjsalt22/poheng/dataset_coco.json"
+
 
 with open(split_json_fn, "r") as f:
     split_json = json.load(f)
@@ -35,7 +38,7 @@ for image in orig_data['data']:
         orig_val["data"].append(image)
     elif split_num == TEST:
         orig_test["data"].append(image)
-
+    
 orig_train_json_fn = f"{output_root}/SpokenCOCO/SpokenCOCO_train_karpathy.json"
 orig_val_json_fn = f"{output_root}/SpokenCOCO/SpokenCOCO_val_karpathy.json"
 orig_test_json_fn = f"{output_root}/SpokenCOCO/SpokenCOCO_test_karpathy.json"

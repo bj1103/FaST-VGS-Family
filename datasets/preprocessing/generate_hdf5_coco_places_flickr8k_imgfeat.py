@@ -123,16 +123,16 @@ if __name__ == "__main__":
     parser.add_argument("--dataset", type=str, choices=['coco', 'places', 'flickr8k'])
     args = parser.parse_args()
     if args.dataset == 'coco':
-        train_audio_dataset_json_file="/data1/scratch/coco_pyp/SpokenCOCO/SpokenCOCO_train_unrolled.json"
-        val_audio_dataset_json_file = "/data1/scratch/coco_pyp/SpokenCOCO/SpokenCOCO_val_unrolled.json"
-        train_img_dataset_tsv_file = "/data1/scratch/coco_pyp/coco_img_feat/train2014_obj36.tsv"
-        val_img_dataset_tsv_file ="/data1/scratch/coco_pyp/coco_img_feat/val2014_obj36.tsv"
+        train_audio_dataset_json_file="/work/vjsalt22/poheng/coco/SpokenCOCO/SpokenCOCO_train_unrolled.json"
+        val_audio_dataset_json_file = "/work/vjsalt22/poheng/coco/SpokenCOCO/SpokenCOCO_val_unrolled.json"
+        train_img_dataset_tsv_file = "/work/vjsalt22/dataset/coco/mscoco_imgfeat/train2014_obj36.tsv"
+        val_img_dataset_tsv_file ="/work/vjsalt22/dataset/coco/mscoco_imgfeat/val2014_obj36.tsv"
 
-        train_img_dataset_hdf5 = "/data1/scratch/coco_pyp/coco_img_feat/SpokenCOCO_train_imgfeat.hdf5"
-        val_img_dataset_hdf5 = "/data1/scratch/coco_pyp/coco_img_feat/SpokenCOCO_val_imgfeat.hdf5"
+        train_img_dataset_hdf5 = "/work/vjsalt22/poheng/coco/mscoco_imgfeat/SpokenCOCO_train_imgfeat.hdf5"
+        val_img_dataset_hdf5 = "/work/vjsalt22/poheng/coco/mscoco_imgfeat/SpokenCOCO_val_imgfeat.hdf5"
 
-        train_imgid2index_file = "/data1/scratch/coco_pyp/SpokenCOCO/SpokenCOCO_train_imgid2idex.json"
-        val_imgid2index_file = "/data1/scratch/coco_pyp/SpokenCOCO/SpokenCOCO_val_imgid2idex.json"
+        train_imgid2index_file = "/work/vjsalt22/poheng/coco/SpokenCOCO/SpokenCOCO_train_imgid2idex.json"
+        val_imgid2index_file = "/work/vjsalt22/poheng/coco/SpokenCOCO/SpokenCOCO_val_imgid2idex.json"
 
         img_data_train = load_obj_tsv(train_img_dataset_tsv_file)
         img_data_val = load_obj_tsv(val_img_dataset_tsv_file)
