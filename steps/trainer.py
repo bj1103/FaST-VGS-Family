@@ -119,8 +119,10 @@ class Trainer:
                         "img_id": batch['img_id'],
                         "label": None
                         }
-
-                losses = self.forward(cur_batch)
+                if self.args.solo_loss:
+                    losses = self.forward_solo(cur_batch)
+                else:
+                    losses = self.forward(cur_batch)
                 if self.use_libri_loss:
                     losses.update(self.dual_encoder(audio_feats = libri_batch['audio'].to(self.device), attention_mask = libri_batch['audio_attention_mask'].to(self.device), target_list = libri_batch['label'], forward_libri=True))
 
