@@ -53,11 +53,11 @@ class Trainer:
         logger.info(f"batch size: {self.args.batch_size}")
         
         if self.args.solo_loss == 'VICReg':
-            self.solo_module_coarse = fast_vgs.VICReg(self.args)
-            self.solo_module_fine = fast_vgs.VICReg(self.args)
+            self.solo_module_coarse = fast_vgs.VICReg(self.args).to(self.device)
+            self.solo_module_fine = fast_vgs.VICReg(self.args).to(self.device)
         elif self.args.solo_loss == 'BarlowTwins':
-            self.solo_module_coarse = fast_vgs.BarlowTwins(self.args)
-            self.solo_module_fine = fast_vgs.BarlowTwins(self.args)
+            self.solo_module_coarse = fast_vgs.BarlowTwins(self.args).to(self.device)
+            self.solo_module_fine = fast_vgs.BarlowTwins(self.args).to(self.device)
             
     def forward(self, batch):
         audio_feats, audio_cls, extended_audio_attention_mask, visual_feats, visual_cls, losses = self.dual_encoder(audio_feats = batch['audio'], attention_mask = batch['audio_attention_mask'], visual_feats = batch['visual_feats'], visual_pos = batch['visual_pos'], target_list = batch['label'])
