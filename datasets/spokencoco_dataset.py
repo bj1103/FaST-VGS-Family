@@ -15,8 +15,8 @@ logger = logging.getLogger(__name__)
 class ImageCaptionDataset(Dataset):
     @staticmethod
     def add_args(parser):
-        parser.add_argument("--data_root", type=str, default="/data1/scratch/coco_pyp")
-        parser.add_argument("--raw_audio_base_path", type=str, default="/data1/scratch/coco_pyp/SpokenCOCO")
+        parser.add_argument("--data_root", type=str, default="/work/vjsalt22/poheng/coco")
+        parser.add_argument("--raw_audio_base_path", type=str, default="/work/vjsalt22/dataset/coco/SpokenCOCO")
         parser.add_argument("--img_feat_len", type=int, help="num of img feats we will use", choices=list(range(1,37)), default=36)
         parser.add_argument("--audio_feat_len", type=float, help="maximal audio length", default=8)
         parser.add_argument("--val_audio_feat_len", type=float, help="maximal audio length", default=10.)
@@ -34,10 +34,10 @@ class ImageCaptionDataset(Dataset):
                 audio_dataset_json_file = os.path.join(args.data_root, "SpokenCOCO/SpokenCOCO_test_unrolled_karpathy.json")
             else:
                 audio_dataset_json_file = os.path.join(args.data_root, "SpokenCOCO/SpokenCOCO_val_unrolled_karpathy.json")
-        train_img_dataset_h5py_file = os.path.join(args.data_root, "coco_img_feat/SpokenCOCO_train_imgfeat.hdf5")
+        train_img_dataset_h5py_file = os.path.join(args.data_root, "mscoco_imgfeat/SpokenCOCO_train_imgfeat.hdf5")
         train_imgid2index_file = os.path.join(args.data_root, "SpokenCOCO/SpokenCOCO_train_imgid2idex.json")
         train_imgid2ordered_indices_file = os.path.join(args.data_root, "SpokenCOCO/SpokenCOCO_train_imgid2ordered_indices.pkl")
-        val_img_dataset_h5py_file = os.path.join(args.data_root, "coco_img_feat/SpokenCOCO_val_imgfeat.hdf5")
+        val_img_dataset_h5py_file = os.path.join(args.data_root, "mscoco_imgfeat/SpokenCOCO_val_imgfeat.hdf5")
         val_imgid2index_file = os.path.join(args.data_root, "SpokenCOCO/SpokenCOCO_val_imgid2idex.json")
         val_imgid2ordered_indices_file = os.path.join(args.data_root, "SpokenCOCO/SpokenCOCO_val_imgid2ordered_indices.pkl")
         self.audio_base_path = args.raw_audio_base_path

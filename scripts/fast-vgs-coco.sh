@@ -1,7 +1,7 @@
 #!/bin/sh
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate my_env
-export CUDA_VISIBLE_DEVICES=0,1
+export CUDA_VISIBLE_DEVICES=0
 
 data_root=$1
 raw_audio_base_path=$2
