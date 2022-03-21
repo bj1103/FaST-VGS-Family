@@ -11,7 +11,7 @@ class BarlowTwins(nn.Module):
         self.projector = Projector(args)
 
         # normalization layer for the representations z1 and z2
-        self.num_features = int(args.mlp.split("-")[-1])
+        self.num_features = int(args.projector_mlp.split("-")[-1])
         self.bn = nn.BatchNorm1d(self.num_features, affine=False)
 
     def forward(self, y1, y2):
