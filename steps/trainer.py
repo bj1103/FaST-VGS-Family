@@ -170,7 +170,8 @@ class Trainer:
 
     def validate_and_save(self, libri=False, places=False):
         self.dual_encoder.eval()
-        self.cross_encoder.eval()
+        if self.args.fine_matching_weight != 0:
+            self.cross_encoder.eval()
         if places:
             r10, r5, r1 = self.validate(self.valid_loader)
             r10_unseen, r5_unseen, r1_unseen = self.validate(self.valid_loader2, unseen=True)
