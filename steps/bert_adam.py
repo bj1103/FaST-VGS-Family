@@ -95,7 +95,7 @@ class BertAdam(Optimizer):
                 if group['t_total'] != -1:
                     schedule_fct = SCHEDULES[group['schedule']]
                     lr_scheduled = group['lr'] * schedule_fct(state['step']/group['t_total'], group['warmup'])
-                    print('lr : ', lr_scheduled)
+                    print('lr : ', lr_scheduled, ' ', f"{lr_scheduled:.15f}")
                 else:
                     lr_scheduled = group['lr']
                 lr.append(lr_scheduled)
