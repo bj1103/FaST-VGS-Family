@@ -192,9 +192,11 @@ class DualEncoder(nn.Module):
         parser.add_argument("--margin", type=float, default=1.0)
         parser.add_argument("--topk", type=float, default=100)
         parser.add_argument("--projector_mlp", type=str, default="1536-1536", help="Size and number of layers of the MLP expander head")
-        parser.add_argument("--sim_coeff", type=float, default=25.0, help="Invariance regularization loss coefficient")
-        parser.add_argument("--std_coeff", type=float, default=25.0, help="Variance regularization loss coefficient")
-        parser.add_argument("--cov_coeff", type=float, default=1.0, help="Covariance regularization loss coefficient")
+        parser.add_argument("--sim_coeff", type=float, default=25.0, help="Invariance regularization loss coefficient for VICReg")
+        parser.add_argument("--std_coeff", type=float, default=25.0, help="Variance regularization loss coefficient for VICReg")
+        parser.add_argument("--cov_coeff", type=float, default=1.0, help="Covariance regularization loss coefficient for VICReg")
+        parser.add_argument("--lambd", type=float, default=0.0051, help="Weight on off-diagonal terms for barlow twins")
+
     def __init__(self, args):
         super().__init__()
         self.args = args
