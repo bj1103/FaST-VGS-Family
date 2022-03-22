@@ -99,7 +99,7 @@ class Trainer:
                     libri_batch = next(libri_loader_iterator)
                 data_end_time = time.time()
                 self.dual_encoder.train()
-                self.cross_encoder.train()
+                # self.cross_encoder.train()
                 if self.progress['num_updates'] > self.total_num_updates:
                     flag = False
                     self.validate_and_save()
@@ -107,7 +107,7 @@ class Trainer:
                     break
                 
                 cur_lr = np.mean(self.optimizer.get_lr())
-
+                assert cur_lr != 0
                 self.writer.add_scalar("lr", cur_lr, self.progress['num_updates'])
                 cur_step = self.progress['num_updates'] % step_per_epoch
 
@@ -485,10 +485,11 @@ class Trainer:
         trainables = trainables1 + trainables2
 
         dual_encoder.to(self.device)
-        cross_encoder.to(self.device)
-
+        if self.args.fine_matching_weight != 0:
+            cross_encoder.to(self.device)
+        else:
+            cross_encoder = None
         return dual_encoder, cross_encoder, trainables, indices, libri_indices, optim_states
-
     def _setup_dataloader(self):
         if self.args.places:
             # raise NotImplementedError
