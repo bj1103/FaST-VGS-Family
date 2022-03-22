@@ -40,7 +40,6 @@ def warmup_linear(x, warmup=0.002):
     """ Specifies a triangular learning rate schedule where peak is reached at `warmup`*`t_total`-th (as provided to BertAdam) training step.
         After `t_total`-th training step, learning rate is zero. """
     if x < warmup:
-        print('warm up', x/warmup)
         return x/warmup
     return max((x-1.)/(warmup-1.), 0)
 
@@ -95,7 +94,6 @@ class BertAdam(Optimizer):
                 if group['t_total'] != -1:
                     schedule_fct = SCHEDULES[group['schedule']]
                     lr_scheduled = group['lr'] * schedule_fct(state['step']/group['t_total'], group['warmup'])
-                    print('lr : ', lr_scheduled, ' ', f"{lr_scheduled:.15f}")
                 else:
                     lr_scheduled = group['lr']
                 lr.append(lr_scheduled)

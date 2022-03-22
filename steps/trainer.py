@@ -108,7 +108,7 @@ class Trainer:
                     break
                 
                 cur_lr = np.mean(self.optimizer.get_lr())
-
+                print(self.optimizer.get_lr())
                 self.writer.add_scalar("lr", cur_lr, self.progress['num_updates'])
                 cur_step = self.progress['num_updates'] % step_per_epoch
 
