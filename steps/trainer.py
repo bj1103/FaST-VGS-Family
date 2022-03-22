@@ -99,7 +99,8 @@ class Trainer:
                     libri_batch = next(libri_loader_iterator)
                 data_end_time = time.time()
                 self.dual_encoder.train()
-                # self.cross_encoder.train()
+                if self.args.fine_matching_weight != 0:
+                    self.cross_encoder.train()
                 if self.progress['num_updates'] > self.total_num_updates:
                     flag = False
                     self.validate_and_save()
@@ -107,6 +108,7 @@ class Trainer:
                     break
                 
                 cur_lr = np.mean(self.optimizer.get_lr())
+
                 self.writer.add_scalar("lr", cur_lr, self.progress['num_updates'])
                 cur_step = self.progress['num_updates'] % step_per_epoch
 
@@ -183,6 +185,29 @@ class Trainer:
             self.progress['best_epoch'] = self.progress['epoch']
             self.progress['best_acc'] = r1
             save_path = os.path.join(self.args.exp_dir,"best_bundle.pth")
+            if self.args.fine_matching_weight != 0:
+                torch.save(
+                    {
+                        "dual_encoder": self.dual_encoder.module.state_dict() if torch.cuda.device_count() > 1 else self.dual_encoder.state_dict(),
+                        "cross_encoder": self.cross_encoder.module.state_dict() if torch.cuda.device_count() > 1 else self.cross_encoder.state_dict(),
+                        "optimizer":  self.optimizer.state_dict(),
+                        "indices": self.train_sampler.state_dict(),
+                        "libri_indices": self.libri_train_sampler.state_dict() if self.libri_train_sampler is not None else None
+                    },save_path
+                )
+            else:
+                torch.save(
+                    {
+                        "dual_encoder": self.dual_encoder.module.state_dict() if torch.cuda.device_count() > 1 else self.dual_encoder.state_dict(),
+                        "optimizer":  self.optimizer.state_dict(),
+                        "indices": self.train_sampler.state_dict(),
+                        "libri_indices": self.libri_train_sampler.state_dict() if self.libri_train_sampler is not None else None
+                    },save_path
+                )
+            logger.info(f"save *best* models at {save_path} at global step {self.progress['num_updates']}")
+        save_progress(self)
+        save_path = os.path.join(self.args.exp_dir,"bundle.pth")
+        if self.args.fine_matching_weight != 0:
             torch.save(
                 {
                     "dual_encoder": self.dual_encoder.module.state_dict() if torch.cuda.device_count() > 1 else self.dual_encoder.state_dict(),
@@ -192,18 +217,15 @@ class Trainer:
                     "libri_indices": self.libri_train_sampler.state_dict() if self.libri_train_sampler is not None else None
                 },save_path
             )
-            logger.info(f"save *best* models at {save_path} at global step {self.progress['num_updates']}")
-        save_progress(self)
-        save_path = os.path.join(self.args.exp_dir,"bundle.pth")
-        torch.save(
-            {
-                "dual_encoder": self.dual_encoder.module.state_dict() if torch.cuda.device_count() > 1 else self.dual_encoder.state_dict(),
-                "cross_encoder": self.cross_encoder.module.state_dict() if torch.cuda.device_count() > 1 else self.cross_encoder.state_dict(),
-                "optimizer":  self.optimizer.state_dict(),
-                "indices": self.train_sampler.state_dict(),
-                "libri_indices": self.libri_train_sampler.state_dict() if self.libri_train_sampler is not None else None
-            },save_path
-        )
+        else:
+            torch.save(
+                {
+                    "dual_encoder": self.dual_encoder.module.state_dict() if torch.cuda.device_count() > 1 else self.dual_encoder.state_dict(),
+                    "optimizer":  self.optimizer.state_dict(),
+                    "indices": self.train_sampler.state_dict(),
+                    "libri_indices": self.libri_train_sampler.state_dict() if self.libri_train_sampler is not None else None
+                },save_path
+            )
         logger.info(f"save models, indices, acc and other statistics at {save_path} and {self.args.exp_dir}/progress.pkl at global step {self.progress['num_updates']}")
 
     def validate(self, valid_loader, unseen = False):
@@ -314,7 +336,8 @@ class Trainer:
 
     def validate_one_to_many(self, hide_progress=True):
         self.dual_encoder.eval()
-        self.cross_encoder.eval()
+        if self.args.fine_matching_weight != 0:
+            self.cross_encoder.eval()
         N_examples = self.valid_loader.dataset.__len__()
 
         with torch.no_grad():
@@ -329,7 +352,8 @@ class Trainer:
             img_feats_list = [] # this is distinct, order is the same as img_img_id_list
             for i, batch in enumerate(self.valid_loader):
                 self.dual_encoder.eval()
-                self.cross_encoder.eval()
+                if self.args.fine_matching_weight != 0:
+                    self.cross_encoder.eval()
                 
                 audio_feats, audio_cls, extended_audio_attention_mask, visual_feats, visual_cls = self.dual_encoder(audio_feats = batch['audio'].to(self.device), attention_mask = batch['audio_attention_mask'].to(self.device), visual_feats = batch['visual_feats'].to(self.device), visual_pos = batch['boxes'].to(self.device), test = True)
                 audio_cls_total.append(audio_cls)
