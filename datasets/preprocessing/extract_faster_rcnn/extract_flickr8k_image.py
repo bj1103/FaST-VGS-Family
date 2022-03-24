@@ -40,23 +40,23 @@ MIN_BOXES = 36
 MAX_BOXES = 36
 
 
-def load_image_ids(img_root, split_dir):
+def load_image_ids(img_root, meta_root, json_fn):
     """images in the same directory are in the same split"""
     pathXid = []
-    # image_id_set = set()
-    # with open(os.path.join(meta_root, json_fn)) as f:
-    #     data = json.load(f)['data']
-    # for item in data:
-    #     if item['image'] not in image_id_set:
-    #         image_id_set.add(item['image'])
-    #         pathXid.append((os.path.join(img_root,item['image']),item['image']))
-    img_root = os.path.join(img_root, split_dir)
-    for name in os.listdir(img_root):
-        idx = name.split(".")[0]
-        pathXid.append(
-                (
-                    os.path.join(img_root, name),
-                    idx))
+    image_id_set = set()
+    with open(os.path.join(meta_root, json_fn)) as f:
+        data = json.load(f)['data']
+    for item in data:
+        if item['image'] not in image_id_set:
+            image_id_set.add(item['image'])
+            pathXid.append((os.path.join(img_root,item['image']),item['image']))
+    # img_root = os.path.join(img_root, split_dir)
+    # for name in os.listdir(img_root):
+    #     idx = name.split(".")[0]
+    #     pathXid.append(
+    #             (
+    #                 os.path.join(img_root, name),
+    #                 idx))
     return pathXid
 
 def generate_tsv(prototxt, weights, image_ids, outfile):
@@ -182,7 +182,7 @@ if __name__ == '__main__':
     args.cfg_file = BUTD_ROOT + "experiments/cfgs/faster_rcnn_end2end_resnet.yml" # s = 500
     args.prototxt = BUTD_ROOT + "models/vg/ResNet-101/faster_rcnn_end2end_final/test.prototxt"
     args.outfile = "/workspace/flickr_imgfeat/%s_obj36.tsv" % args.split
-    
+    args.infile = "flickr8k_%s.json" % args.split
     print('Called with args:')
     print(args)
 
@@ -194,7 +194,7 @@ if __name__ == '__main__':
     assert cfg.TEST.HAS_RPN
 
     # Load image ids, need modification for new datasets.
-    image_ids = load_image_ids(args.imgroot, args.split)  
+    image_ids = load_image_ids(args.imgroot, args.metaroot, args.infile)  
     
     # Generate TSV files, noramlly do not need to modify
     args.caffemodel = os.path.join(args.model_root, args.caffemodel)
