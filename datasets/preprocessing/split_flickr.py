@@ -24,7 +24,7 @@ for image in data['images']:
 
 with open('/Users/kevin/Desktop/flickr8k_train.json', 'w') as f:
     json.dump({ 'data': train }, f)
-with open('/Users/kevin/Desktop/flickr8k_val.json', 'w') as f:
+with open('/Users/kevin/Desktop/flickr8k_dev.json', 'w') as f:
     json.dump({ 'data': val }, f)
 with open('/Users/kevin/Desktop/flickr8k_test.json', 'w') as f:
     json.dump({ 'data': test }, f)
