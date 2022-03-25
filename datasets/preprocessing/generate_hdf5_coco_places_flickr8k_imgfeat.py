@@ -179,25 +179,25 @@ if __name__ == "__main__":
             generate_h5py(audio_dataset_json_file, img_dataset_hdf5, imgid2index_file, img_data, places=True)
 
     elif args.dataset == 'flickr8k':
-        train_audio_dataset_json_file="/work/vjsalt22/poheng/flickr/flickr8k/flickr8k_train.json"
-        val_audio_dataset_json_file = "/work/vjsalt22/poheng/flickr/flickr8k/flickr8k_val.json"
-        test_audio_dataset_json_file = "/work/vjsalt22/poheng/flickr/flickr8k/flickr8k_test.json"
+        train_audio_dataset_json_file="/work/vjsalt22/poheng/flickr/flickr8k_train.json"
+        val_audio_dataset_json_file = "/work/vjsalt22/poheng/flickr/flickr8k_val.json"
+        test_audio_dataset_json_file = "/work/vjsalt22/poheng/flickr/flickr8k_test.json"
 
-        train_img_dataset_tsv_file = "/data1/scratch/datasets_pyp/flickr8k/img_feat/flickr8k_train_obj36.tsv"
-        val_img_dataset_tsv_file = "/data1/scratch/datasets_pyp/flickr8k/img_feat/flickr8k_dev_obj36.tsv"
-        test_img_dataset_tsv_file = "/data1/scratch/datasets_pyp/flickr8k/img_feat/flickr8k_test_obj36.tsv"
+        train_img_dataset_tsv_file = "//work/vjsalt22/dataset/flickr/flickr_imgfeat/flickr8k_train_obj36.tsv"
+        val_img_dataset_tsv_file = "//work/vjsalt22/dataset/flickr/flickr_imgfeat/flickr8k_dev_obj36.tsv"
+        test_img_dataset_tsv_file = "//work/vjsalt22/dataset/flickr/flickr_imgfeat/flickr8k_test_obj36.tsv"
 
-        train_img_dataset_hdf5 = "/data1/scratch/datasets_pyp/flickr8k/img_feat/flickr8k_train_obj36.hdf5"
-        val_img_dataset_hdf5 = "/data1/scratch/datasets_pyp/flickr8k/img_feat/flickr8k_dev_obj36.hdf5"
-        test_img_dataset_hdf5 = "/data1/scratch/datasets_pyp/flickr8k/img_feat/flickr8k_test_obj36.hdf5"
+        train_img_dataset_hdf5 = "/work/vjsalt22/poheng/flickr/flickr8k_train_obj36.hdf5"
+        val_img_dataset_hdf5 = "/work/vjsalt22/poheng/flickr/flickr8k_dev_obj36.hdf5"
+        test_img_dataset_hdf5 = "/work/vjsalt22/poheng/flickr/flickr8k_test_obj36.hdf5"
 
-        train_imgid2index_file = "/data1/scratch/datasets_pyp/flickr8k/flickr8k_train_imgid2idex.json"
-        val_imgid2index_file = "/data1/scratch/datasets_pyp/flickr8k/flickr8k_dev_imgid2idex.json"
-        test_imgid2index_file = "/data1/scratch/datasets_pyp/flickr8k/flickr8k_test_imgid2idex.json"
+        train_imgid2index_file = "/work/vjsalt22/poheng/flickr/flickr8k_train_imgid2idex.json"
+        val_imgid2index_file = "/work/vjsalt22/poheng/flickr/flickr8k_dev_imgid2idex.json"
+        test_imgid2index_file = "/work/vjsalt22/poheng/flickr/flickr8k_test_imgid2idex.json"
         
-        train_imgid2ordered_file = "/data1/scratch/datasets_pyp/flickr8k/flickr8k_train_imgid2ordered_indices.pkl"
-        val_imgid2ordered_file = "/data1/scratch/datasets_pyp/flickr8k/flickr8k_dev_imgid2ordered_indices.pkl"
-        test_imgid2ordered_file = "/data1/scratch/datasets_pyp/flickr8k/flickr8k_test_imgid2ordered_indices.pkl"
+        train_imgid2ordered_file = "/work/vjsalt22/poheng/flickr/flickr8k_train_imgid2ordered_indices.pkl"
+        val_imgid2ordered_file = "/work/vjsalt22/poheng/flickr/flickr8k_dev_imgid2ordered_indices.pkl"
+        test_imgid2ordered_file = "/work/vjsalt22/poheng/flickr/flickr8k_test_imgid2ordered_indices.pkl"
 
         img_data_train = load_obj_tsv(train_img_dataset_tsv_file)
         img_data_val = load_obj_tsv(val_img_dataset_tsv_file)

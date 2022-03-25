@@ -1,6 +1,6 @@
 import json
 
-with open('/Users/kevin/Desktop/dataset_flickr8k.json', 'r') as f:
+with open('/work/vjsalt22/poheng/dataset_flickr8k.json', 'r') as f:
     data = json.load(f)
 
 train = []
@@ -22,9 +22,9 @@ for image in data['images']:
         raise AssertionError()
 
 
-with open('/Users/kevin/Desktop/flickr8k_train.json', 'w') as f:
+with open('/work/vjsalt22/poheng/flickr/flickr8k_train.json', 'w') as f:
     json.dump({ 'data': train }, f)
-with open('/Users/kevin/Desktop/flickr8k_dev.json', 'w') as f:
+with open('/work/vjsalt22/poheng/flickr/flickr8k_dev.json', 'w') as f:
     json.dump({ 'data': val }, f)
-with open('/Users/kevin/Desktop/flickr8k_test.json', 'w') as f:
+with open('/work/vjsalt22/poheng/flickr/flickr8k_test.json', 'w') as f:
     json.dump({ 'data': test }, f)
