@@ -1,4 +1,5 @@
 import base64
+import imp
 import numpy as np
 import json
 # import cv2
@@ -13,6 +14,7 @@ import base64
 import time
 import argparse
 import numpy as np
+import pickle
 
 csv.field_size_limit(sys.maxsize)
 FIELDNAMES = ["img_id", "img_h", "img_w", "objects_id", "objects_conf",
@@ -60,7 +62,7 @@ def load_obj_tsv(fname, topk=None):
 
 
 
-def generate_h5py(audio_dataset_json_file, img_dataset_hdf5, img_id2index_file, img_data, places = False, flickr8k=False):
+def generate_h5py(audio_dataset_json_file, img_dataset_hdf5, img_id2index_file, img_id2ordered_file, img_data, places = False, flickr8k=False):
     with open(audio_dataset_json_file, 'r') as fp:
         data_json = json.load(fp)
     audio_data = data_json['data']
@@ -76,6 +78,7 @@ def generate_h5py(audio_dataset_json_file, img_dataset_hdf5, img_id2index_file, 
     print(f"total img used: {n}")
 
     img_id2index = {}
+    img_id2ordered = {}
     print(f"dump image data into {img_dataset_hdf5}")
 
     Path(os.path.dirname(img_dataset_hdf5)).mkdir(parents=True, exist_ok=True)
@@ -109,6 +112,8 @@ def generate_h5py(audio_dataset_json_file, img_dataset_hdf5, img_id2index_file, 
         dset_attrs_id[index,:] = datum['attrs_id']
         dset_attrs_conf[index,:] = datum['attrs_conf']
 
+        ordered_index = np.argsort(datum['objects_conf'])[::-1]
+        img_id2ordered[img_id] = ordered_index
 
         if index % 5000 == 0:
             t = time.time() - start
@@ -116,6 +121,9 @@ def generate_h5py(audio_dataset_json_file, img_dataset_hdf5, img_id2index_file, 
             # break
     with open(img_id2index_file, "w") as f:
         json.dump(img_id2index, f)
+    with open(img_id2ordered_file, "wb") as f:
+        pickle.dump(img_id2ordered, f)
+    print(f"save img_id2ordered_indices to {img_id2ordered_file}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -133,6 +141,9 @@ if __name__ == "__main__":
         train_imgid2index_file = "/work/vjsalt22/poheng/coco/SpokenCOCO/SpokenCOCO_train_imgid2idex.json"
         val_imgid2index_file = "/work/vjsalt22/poheng/coco/SpokenCOCO/SpokenCOCO_val_imgid2idex.json"
 
+        train_imgid2ordered_file = "/work/vjsalt22/poheng/coco/SpokenCOCO/SpokenCOCO_train_imgid2ordered_indices.pkl"
+        val_imgid2ordered_file = "/work/vjsalt22/poheng/coco/SpokenCOCO/SpokenCOCO_val_imgid2ordered_indices.pkl"
+
         img_data_train = load_obj_tsv(train_img_dataset_tsv_file)
         img_data_val = load_obj_tsv(val_img_dataset_tsv_file)
 
@@ -142,8 +153,8 @@ if __name__ == "__main__":
         for img_datum in img_data_val:
             img_data[img_datum['img_id']] = img_datum
 
-        generate_h5py(train_audio_dataset_json_file, train_img_dataset_hdf5, train_imgid2index_file, img_data)
-        generate_h5py(val_audio_dataset_json_file, val_img_dataset_hdf5, val_imgid2index_file, img_data)
+        generate_h5py(train_audio_dataset_json_file, train_img_dataset_hdf5, train_imgid2index_file, train_imgid2ordered_file, img_data)
+        generate_h5py(val_audio_dataset_json_file, val_img_dataset_hdf5, val_imgid2index_file, val_imgid2ordered_file, img_data)
     elif args.dataset == 'places':
         json_root = "/data1/scratch/places_hdf5_pyp/metadata"
         tsv_root = "/data1/scratch/places_hdf5_pyp/places_imgfeat"
@@ -168,9 +179,9 @@ if __name__ == "__main__":
             generate_h5py(audio_dataset_json_file, img_dataset_hdf5, imgid2index_file, img_data, places=True)
 
     elif args.dataset == 'flickr8k':
-        train_audio_dataset_json_file="/home/harwath/data/flickr8k_spoken_captions/flickr8k_train.json"
-        val_audio_dataset_json_file = "/home/harwath/data/flickr8k_spoken_captions/flickr8k_dev.json"
-        test_audio_dataset_json_file = "/home/harwath/data/flickr8k_spoken_captions/flickr8k_test.json"
+        train_audio_dataset_json_file="/work/vjsalt22/poheng/flickr/flickr8k/flickr8k_train.json"
+        val_audio_dataset_json_file = "/work/vjsalt22/poheng/flickr/flickr8k/flickr8k_val.json"
+        test_audio_dataset_json_file = "/work/vjsalt22/poheng/flickr/flickr8k/flickr8k_test.json"
 
         train_img_dataset_tsv_file = "/data1/scratch/datasets_pyp/flickr8k/img_feat/flickr8k_train_obj36.tsv"
         val_img_dataset_tsv_file = "/data1/scratch/datasets_pyp/flickr8k/img_feat/flickr8k_dev_obj36.tsv"
@@ -184,6 +195,10 @@ if __name__ == "__main__":
         val_imgid2index_file = "/data1/scratch/datasets_pyp/flickr8k/flickr8k_dev_imgid2idex.json"
         test_imgid2index_file = "/data1/scratch/datasets_pyp/flickr8k/flickr8k_test_imgid2idex.json"
         
+        train_imgid2ordered_file = "/data1/scratch/datasets_pyp/flickr8k/flickr8k_train_imgid2ordered_indices.pkl"
+        val_imgid2ordered_file = "/data1/scratch/datasets_pyp/flickr8k/flickr8k_dev_imgid2ordered_indices.pkl"
+        test_imgid2ordered_file = "/data1/scratch/datasets_pyp/flickr8k/flickr8k_test_imgid2ordered_indices.pkl"
+
         img_data_train = load_obj_tsv(train_img_dataset_tsv_file)
         img_data_val = load_obj_tsv(val_img_dataset_tsv_file)
         img_data_test = load_obj_tsv(test_img_dataset_tsv_file)
@@ -192,16 +207,16 @@ if __name__ == "__main__":
         img_data = {}
         for img_datum in img_data_val:
             img_data[img_datum['img_id']] = img_datum
-        generate_h5py(val_audio_dataset_json_file, val_img_dataset_hdf5, val_imgid2index_file, img_data, flickr8k=True)
+        generate_h5py(val_audio_dataset_json_file, val_img_dataset_hdf5, val_imgid2index_file, val_imgid2ordered_file, img_data, flickr8k=True)
 
         print("test")
         img_data = {}
         for img_datum in img_data_test:
             img_data[img_datum['img_id']] = img_datum
-        generate_h5py(test_audio_dataset_json_file, test_img_dataset_hdf5, test_imgid2index_file, img_data, flickr8k=True)
+        generate_h5py(test_audio_dataset_json_file, test_img_dataset_hdf5, test_imgid2index_file, test_imgid2ordered_file, img_data, flickr8k=True)
 
         print("train")
         img_data = {}
         for img_datum in img_data_train:
             img_data[img_datum['img_id']] = img_datum
-        generate_h5py(train_audio_dataset_json_file, train_img_dataset_hdf5, train_imgid2index_file, img_data, flickr8k=True)
+        generate_h5py(train_audio_dataset_json_file, train_img_dataset_hdf5, train_imgid2index_file, train_imgid2ordered_file, img_data, flickr8k=True)
