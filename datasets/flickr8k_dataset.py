@@ -14,8 +14,8 @@ logger = logging.getLogger(__name__)
 class ImageCaptionDataset(Dataset):
     @staticmethod
     def add_args(parser):
-        parser.add_argument("--data_root", type=str, default="/data1/scratch/datasets_pyp/flickr8k")
-        parser.add_argument("--raw_audio_base_path", type=str, default="/home/harwath/data/flickr8k_spoken_captions")
+        parser.add_argument("--data_root", type=str, default="/work/vjsalt22/poheng/flickr")
+        parser.add_argument("--raw_audio_base_path", type=str, default="/work/vjsalt22/dataset/flickr/flickr_audio/wavs")
         parser.add_argument("--img_feat_len", type=int, help="num of img feats we will use", choices=list(range(1,37)), default=36)
         parser.add_argument("--audio_feat_len", type=float, help="maximal audio length", default=8)
         parser.add_argument("--val_audio_feat_len", type=float, help="maximal audio length", default=10.)
@@ -26,7 +26,7 @@ class ImageCaptionDataset(Dataset):
         self.audio_feat_len = args.audio_feat_len if "train" in split else args.val_audio_feat_len
         split_name = split.replace("val", "dev") if not self.args.test else "test" # just in case you input val, instead of dev
         audio_dataset_json_file = os.path.join(args.data_root, f"flickr8k_{split_name}.json")
-        img_dataset_h5py_file = os.path.join(args.data_root, f"img_feat/flickr8k_{split_name}_obj36.hdf5")
+        img_dataset_h5py_file = os.path.join(args.data_root, f"flickr8k_{split_name}_obj36.hdf5")
         img_id2index_file = os.path.join(args.data_root, f"flickr8k_{split_name}_imgid2idex.json")
         imgid2ordered_indices_file = os.path.join(args.data_root, f"flickr8k_{split_name}_imgid2ordered_indices.pkl")
         self.audio_base_path = args.raw_audio_base_path
