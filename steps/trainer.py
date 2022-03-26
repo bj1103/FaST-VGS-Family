@@ -3,6 +3,7 @@ import os
 import torch
 import math
 from tqdm import tqdm
+import torch.nn.functional as F
 import torch.nn as nn
 from torch.utils.tensorboard import SummaryWriter
 import numpy as np
@@ -186,47 +187,41 @@ class Trainer:
             self.progress['best_epoch'] = self.progress['epoch']
             self.progress['best_acc'] = r1
             save_path = os.path.join(self.args.exp_dir,"best_bundle.pth")
+            save_dict = {
+                "dual_encoder": self.dual_encoder.module.state_dict() if torch.cuda.device_count() > 1 else self.dual_encoder.state_dict(),
+                "optimizer":  self.optimizer.state_dict(),
+                "indices": self.train_sampler.state_dict(),
+                "libri_indices": self.libri_train_sampler.state_dict() if self.libri_train_sampler is not None else None
+            }
             if self.args.fine_matching_weight != 0:
-                torch.save(
-                    {
-                        "dual_encoder": self.dual_encoder.module.state_dict() if torch.cuda.device_count() > 1 else self.dual_encoder.state_dict(),
-                        "cross_encoder": self.cross_encoder.module.state_dict() if torch.cuda.device_count() > 1 else self.cross_encoder.state_dict(),
-                        "optimizer":  self.optimizer.state_dict(),
-                        "indices": self.train_sampler.state_dict(),
-                        "libri_indices": self.libri_train_sampler.state_dict() if self.libri_train_sampler is not None else None
-                    },save_path
-                )
-            else:
-                torch.save(
-                    {
-                        "dual_encoder": self.dual_encoder.module.state_dict() if torch.cuda.device_count() > 1 else self.dual_encoder.state_dict(),
-                        "optimizer":  self.optimizer.state_dict(),
-                        "indices": self.train_sampler.state_dict(),
-                        "libri_indices": self.libri_train_sampler.state_dict() if self.libri_train_sampler is not None else None
-                    },save_path
-                )
+                if self.args.solo_loss:
+                    save_dict["solo_module_fine"] = self.solo_module_fine.module.state_dict()  if torch.cuda.device_count() > 1 else self.solo_module_fine.state_dict()
+                else:
+                    save_dict["cross_encoder"] = self.cross_encoder.module.state_dict() if torch.cuda.device_count() > 1 else self.cross_encoder.state_dict()
+                
+            if self.args.solo_loss:
+                save_dict["solo_module_coarse"] = self.solo_module_coarse.module.state_dict() if torch.cuda.device_count() > 1 else self.solo_module_coarse.state_dict()
+
+            torch.save(save_dict, save_path)
             logger.info(f"save *best* models at {save_path} at global step {self.progress['num_updates']}")
         save_progress(self)
         save_path = os.path.join(self.args.exp_dir,"bundle.pth")
+        save_dict = {
+            "dual_encoder": self.dual_encoder.module.state_dict() if torch.cuda.device_count() > 1 else self.dual_encoder.state_dict(),
+            "optimizer":  self.optimizer.state_dict(),
+            "indices": self.train_sampler.state_dict(),
+            "libri_indices": self.libri_train_sampler.state_dict() if self.libri_train_sampler is not None else None
+        }
         if self.args.fine_matching_weight != 0:
-            torch.save(
-                {
-                    "dual_encoder": self.dual_encoder.module.state_dict() if torch.cuda.device_count() > 1 else self.dual_encoder.state_dict(),
-                    "cross_encoder": self.cross_encoder.module.state_dict() if torch.cuda.device_count() > 1 else self.cross_encoder.state_dict(),
-                    "optimizer":  self.optimizer.state_dict(),
-                    "indices": self.train_sampler.state_dict(),
-                    "libri_indices": self.libri_train_sampler.state_dict() if self.libri_train_sampler is not None else None
-                },save_path
-            )
-        else:
-            torch.save(
-                {
-                    "dual_encoder": self.dual_encoder.module.state_dict() if torch.cuda.device_count() > 1 else self.dual_encoder.state_dict(),
-                    "optimizer":  self.optimizer.state_dict(),
-                    "indices": self.train_sampler.state_dict(),
-                    "libri_indices": self.libri_train_sampler.state_dict() if self.libri_train_sampler is not None else None
-                },save_path
-            )
+            if self.args.solo_loss:
+                save_dict["solo_module_fine"] = self.solo_module_fine.module.state_dict()  if torch.cuda.device_count() > 1 else self.solo_module_fine.state_dict()
+            else:
+                save_dict["cross_encoder"] = self.cross_encoder.module.state_dict() if torch.cuda.device_count() > 1 else self.cross_encoder.state_dict()
+            
+        if self.args.solo_loss:
+            save_dict["solo_module_coarse"] = self.solo_module_coarse.module.state_dict() if torch.cuda.device_count() > 1 else self.solo_module_coarse.state_dict()
+
+        torch.save(save_dict, save_path)
         logger.info(f"save models, indices, acc and other statistics at {save_path} and {self.args.exp_dir}/progress.pkl at global step {self.progress['num_updates']}")
 
     def validate(self, valid_loader, unseen = False):
@@ -378,8 +373,15 @@ class Trainer:
             extended_audio_attention_mask_total = torch.cat(extended_audio_attention_mask_total)
             audio_img_id_total = np.concatenate(audio_img_id_total)
             img_img_id_list = np.array(img_img_id_list)
-
-            coarse_cross_relationship_score_matrix = img_cls_list @ audio_cls_total.transpose(0,1)
+            if self.args.solo_loss:
+                coarse_cross_relationship_score_matrix = []
+                for i in range(len(img_cls_list)):
+                    img_cls_i = torch.stack([img_cls_list[i] for j in range(len(audio_cls_total))])
+                    score_i = F.mse_loss(img_cls_i, audio_cls_total)
+                    coarse_cross_relationship_score_matrix.append(score_i)
+                coarse_cross_relationship_score_matrix = torch.stack(coarse_cross_relationship_score_matrix)
+            else:
+                coarse_cross_relationship_score_matrix = img_cls_list @ audio_cls_total.transpose(0,1)
             recalls = calc_recalls_from_S_one_to_many_coarse(coarse_cross_relationship_score_matrix, row_img_id=img_img_id_list, column_img_id=audio_img_id_total)
             avg_acc_coarse = (recalls['A_r10'] + recalls['I_r10']) / 2
             avg_acc_r1_coarse = (recalls['A_r1'] + recalls['I_r1']) / 2
