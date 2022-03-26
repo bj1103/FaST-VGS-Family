@@ -42,6 +42,14 @@ class Trainer:
         self.seed_everything(seed=self.args.seed)
         self.meters = self._setup_meters()
         self.progress, self.total_progress = setup_progress(self)
+        
+        if self.args.solo_loss == 'VICReg':
+            self.solo_module_coarse = fast_vgs.VICReg(self.args).to(self.device)
+            self.solo_module_fine = fast_vgs.VICReg(self.args).to(self.device)
+        elif self.args.solo_loss == 'BarlowTwins':
+            self.solo_module_coarse = fast_vgs.BarlowTwins(self.args).to(self.device)
+            self.solo_module_fine = fast_vgs.BarlowTwins(self.args).to(self.device)
+           
         self.dual_encoder, self.cross_encoder, self.trainables, self.indices, self.libri_indices, self.optim_states = self._setup_models()
         self.use_libri_loss = self.args.libri_w2v2_weight != None
         self.train_loader, self.valid_loader, self.valid_loader2, self.train_sampler, self.libri_train_loader, self.libri_valid_loader, self.libri_train_sampler, self.train_data_length = self._setup_dataloader()
@@ -54,13 +62,7 @@ class Trainer:
         self.criterion = fast_vgs.Margin_InfoNCE_loss
         logger.info(f"batch size: {self.args.batch_size}")
         
-        if self.args.solo_loss == 'VICReg':
-            self.solo_module_coarse = fast_vgs.VICReg(self.args).to(self.device)
-            self.solo_module_fine = fast_vgs.VICReg(self.args).to(self.device)
-        elif self.args.solo_loss == 'BarlowTwins':
-            self.solo_module_coarse = fast_vgs.BarlowTwins(self.args).to(self.device)
-            self.solo_module_fine = fast_vgs.BarlowTwins(self.args).to(self.device)
-            
+         
     def forward(self, batch):
         audio_feats, audio_cls, extended_audio_attention_mask, visual_feats, visual_cls, losses = self.dual_encoder(audio_feats = batch['audio'], attention_mask = batch['audio_attention_mask'], visual_feats = batch['visual_feats'], visual_pos = batch['visual_pos'], target_list = batch['label'])
         coarse_cross_relationship_score_matrix = visual_cls @ audio_cls.transpose(0,1)
