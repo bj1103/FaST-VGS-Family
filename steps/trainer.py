@@ -382,6 +382,9 @@ class Trainer:
                 coarse_cross_relationship_score_matrix = torch.stack(coarse_cross_relationship_score_matrix)
             else:
                 coarse_cross_relationship_score_matrix = img_cls_list @ audio_cls_total.transpose(0,1)
+            a = img_cls_list @ audio_cls_total.transpose(0,1)
+            print(coarse_cross_relationship_score_matrix.shape)
+            print(a.shape)
             recalls = calc_recalls_from_S_one_to_many_coarse(coarse_cross_relationship_score_matrix, row_img_id=img_img_id_list, column_img_id=audio_img_id_total)
             avg_acc_coarse = (recalls['A_r10'] + recalls['I_r10']) / 2
             avg_acc_r1_coarse = (recalls['A_r1'] + recalls['I_r1']) / 2
