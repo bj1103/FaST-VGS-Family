@@ -380,7 +380,7 @@ class Trainer:
                     score_i = F.mse_loss(img_cls_i, audio_cls_total, reduction='none')
                     score_i = torch.mean(score_i, dim=-1)
                     coarse_cross_relationship_score_matrix.append(score_i)
-                coarse_cross_relationship_score_matrix = torch.stack(coarse_cross_relationship_score_matrix)
+                coarse_cross_relationship_score_matrix = torch.stack(coarse_cross_relationship_score_matrix) * -1
             else:
                 coarse_cross_relationship_score_matrix = img_cls_list @ audio_cls_total.transpose(0,1)
             
