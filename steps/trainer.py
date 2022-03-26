@@ -513,6 +513,10 @@ class Trainer:
         trainables1 = [p for p in dual_encoder.parameters() if p.requires_grad]
         trainables2 = [p for p in cross_encoder.parameters() if p.requires_grad]
         trainables = trainables1 + trainables2
+        if self.args.solo_loss:
+            trainables3 = [p for p in self.solo_module_coarse.parameters() if p.requires_grad]
+            trainables4 = [p for p in self.solo_module_fine.parameters() if p.requires_grad]
+            trainables += trainables3 + trainables4
 
         dual_encoder.to(self.device)
         if self.args.fine_matching_weight != 0:
