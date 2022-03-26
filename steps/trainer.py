@@ -32,6 +32,7 @@ class Trainer:
         parser.add_argument("--lr", type=float, default=0.0001)
         parser.add_argument("--warmup_fraction", type=float, default=0.1)
         parser.add_argument("--solo_loss", type=str, default=None)
+        parser.add_argument("--grad_accum", type=int, default=1)
     def __init__(self, args):
         self.start_time = time.time()
         self.args = args
@@ -133,15 +134,16 @@ class Trainer:
                         self.meters[key].update(losses[key].mean().cpu().item(), cur_batch['visual_feats'].shape[0])
                         self.writer.add_scalar(key, self.meters[key].val, self.progress['num_updates'])
                 
-                weighted_loss = self.weight_loss(losses)
+                weighted_loss = self.weight_loss(losses) / self.args.grad_accum
 
                 self.meters['weighted_loss'].update(weighted_loss.item(), cur_batch['visual_feats'].shape[0])
                 self.writer.add_scalar('weighted_loss', weighted_loss.item(), self.progress['num_updates'])
 
                 weighted_loss.backward()
                 torch.nn.utils.clip_grad_norm_(self.trainables, 1.)
-                self.optimizer.step()
-                self.optimizer.zero_grad()
+                if ((i + 1) % self.args.grad_accum == 0) or (i + 1 == len(self.train_loader)):
+                    self.optimizer.step()
+                    self.optimizer.zero_grad()
                 self.meters['data_time'].update(data_end_time - data_start_time)
                 self.meters['train_time'].update(time.time() - data_end_time)
                 #########
