@@ -27,14 +27,23 @@ class VICReg(nn.Module):
         super().__init__()
         self.args = args
         self.num_features = int(self.args.projector_mlp.split("-")[-1])
-        self.projector = Projector(self.args)
+        self.projector_a = Projector(self.args)
+        self.projector_i = Projector(self.args)
 
-    def forward(self, x, y):
+    def forward(self, x, y, ids):
         B = x.shape[0]
-        x = self.projector(x)
-        y = self.projector(y)
+        x = self.projector_a(x)
+        y = self.projector_i(y)
 
         repr_loss = F.mse_loss(x, y)
+        unique_id = set()
+        unique_index = []
+        for i, id in enumerate(ids):
+            if id not in unique_id:
+                unique_id.add(id)
+                unique_index.append(i)
+        x = torch.index_select(x, 0, unique_index)
+        y = torch.index_select(y, 0, unique_index)
 
         # x = torch.cat(FullGatherLayer.apply(x), dim=0)
         # y = torch.cat(FullGatherLayer.apply(y), dim=0)

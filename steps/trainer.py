@@ -33,6 +33,12 @@ class Trainer:
         parser.add_argument("--warmup_fraction", type=float, default=0.1)
         parser.add_argument("--solo_loss", type=str, default=None)
         parser.add_argument("--grad_accum", type=int, default=1)
+        parser.add_argument("--projector_mlp", type=str, default="1536-1536", help="Size and number of layers of the MLP expander head")
+        parser.add_argument("--sim_coeff", type=float, default=25.0, help="Invariance regularization loss coefficient for VICReg")
+        parser.add_argument("--std_coeff", type=float, default=25.0, help="Variance regularization loss coefficient for VICReg")
+        parser.add_argument("--cov_coeff", type=float, default=1.0, help="Covariance regularization loss coefficient for VICReg")
+        parser.add_argument("--lambd", type=float, default=0.0051, help="Weight on off-diagonal terms for barlow twins")
+    
     def __init__(self, args):
         self.start_time = time.time()
         self.args = args
@@ -79,7 +85,7 @@ class Trainer:
 
     def forward_solo(self, batch):
         audio_feats, audio_cls, extended_audio_attention_mask, visual_feats, visual_cls, losses = self.dual_encoder(audio_feats = batch['audio'], attention_mask = batch['audio_attention_mask'], visual_feats = batch['visual_feats'], visual_pos = batch['visual_pos'], target_list = batch['label'])
-        losses['coarse_matching_loss'] = self.solo_module_coarse(audio_cls, visual_cls)
+        losses['coarse_matching_loss'] = self.solo_module_coarse(audio_cls, visual_cls, batch["img_id"])
         
         if self.args.fine_matching_weight != 0:
             B = visual_feats.shape[0]
@@ -357,8 +363,8 @@ class Trainer:
                 
                 audio_feats, audio_cls, extended_audio_attention_mask, visual_feats, visual_cls = self.dual_encoder(audio_feats = batch['audio'].to(self.device), attention_mask = batch['audio_attention_mask'].to(self.device), visual_feats = batch['visual_feats'].to(self.device), visual_pos = batch['boxes'].to(self.device), test = True)
                 if self.args.solo_loss:
-                    audio_cls = self.solo_module_coarse.projector(audio_cls)
-                    visual_cls = self.solo_module_coarse.projector(visual_cls)
+                    audio_cls = self.solo_module_coarse.projector_a(audio_cls)
+                    visual_cls = self.solo_module_coarse.projector_i(visual_cls)
 
                 audio_cls_total.append(audio_cls)
                 # visual_cls_total.append(visual_cls)
