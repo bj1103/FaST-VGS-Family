@@ -34,6 +34,7 @@ class Trainer:
         parser.add_argument("--solo_loss", type=str, default=None)
         parser.add_argument("--grad_accum", type=int, default=1)
         parser.add_argument("--projector_mlp", type=str, default="1536-1536", help="Size and number of layers of the MLP expander head")
+        parser.add_argument("--same_projector", action="store_true", default=False, help="Same projector for audio and image")
         parser.add_argument("--sim_coeff", type=float, default=25.0, help="Invariance regularization loss coefficient for VICReg")
         parser.add_argument("--std_coeff", type=float, default=25.0, help="Variance regularization loss coefficient for VICReg")
         parser.add_argument("--cov_coeff", type=float, default=1.0, help="Covariance regularization loss coefficient for VICReg")
