@@ -356,6 +356,10 @@ class Trainer:
                     self.cross_encoder.eval()
                 
                 audio_feats, audio_cls, extended_audio_attention_mask, visual_feats, visual_cls = self.dual_encoder(audio_feats = batch['audio'].to(self.device), attention_mask = batch['audio_attention_mask'].to(self.device), visual_feats = batch['visual_feats'].to(self.device), visual_pos = batch['boxes'].to(self.device), test = True)
+                if self.args.solo_loss:
+                    audio_cls = self.solo_module_coarse.projector(audio_cls)
+                    visual_cls = self.solo_module_coarse.projector(visual_cls)
+
                 audio_cls_total.append(audio_cls)
                 # visual_cls_total.append(visual_cls)
                 audio_feats_total.append(audio_feats.detach()) # still on cude after .detach(), just removed from graph, so no gradient
@@ -477,7 +481,12 @@ class Trainer:
         if self.args.trained_weights_dir != None:
             bundle = torch.load(os.path.join(self.args.trained_weights_dir, "best_bundle.pth"))
             dual_encoder.carefully_load_state_dict(bundle['dual_encoder'])
-            cross_encoder.carefully_load_state_dict(bundle['cross_encoder'])
+            if self.args.fine_matching_weight != 0:
+                cross_encoder.carefully_load_state_dict(bundle['cross_encoder'])
+                if self.args.solo_loss:
+                    self.solo_module_fine.load_state_dict(bundle['solo_module_fine'])
+            if self.args.solo_loss:
+                self.solo_module_coarse.load_state_dict(bundle['solo_module_coarse'])
             indices = None
             libri_indices = None
             optim_states = None
@@ -486,7 +495,12 @@ class Trainer:
         elif self.args.validate:
             bundle = torch.load(os.path.join(self.args.exp_dir, "best_bundle.pth"))
             dual_encoder.carefully_load_state_dict(bundle['dual_encoder'])
-            cross_encoder.carefully_load_state_dict(bundle['cross_encoder'])
+            if self.args.fine_matching_weight != 0:
+                cross_encoder.carefully_load_state_dict(bundle['cross_encoder'])
+                if self.args.solo_loss:
+                    self.solo_module_fine.load_state_dict(bundle['solo_module_fine'])
+            if self.args.solo_loss:
+                self.solo_module_coarse.load_state_dict(bundle['solo_module_coarse'])
             indices = None
             libri_indices = None
             optim_states = None
@@ -495,7 +509,12 @@ class Trainer:
         elif self.progress['num_updates'] > 1:
             bundle = torch.load(os.path.join(self.args.exp_dir, "bundle.pth"))
             dual_encoder.carefully_load_state_dict(bundle['dual_encoder'])
-            cross_encoder.carefully_load_state_dict(bundle['cross_encoder'])
+            if self.args.fine_matching_weight != 0:
+                cross_encoder.carefully_load_state_dict(bundle['cross_encoder'])
+                if self.args.solo_loss:
+                    self.solo_module_fine.load_state_dict(bundle['solo_module_fine'])
+            if self.args.solo_loss:
+                self.solo_module_coarse.load_state_dict(bundle['solo_module_coarse'])
             indices = bundle['indices']
             libri_indices = bundle['libri_indices']
             optim_states = bundle['optimizer']
