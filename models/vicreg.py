@@ -42,8 +42,9 @@ class VICReg(nn.Module):
             if id not in unique_id:
                 unique_id.add(id)
                 unique_index.append(i)
-        x = torch.index_select(x, 0, unique_index)
-        y = torch.index_select(y, 0, unique_index)
+        
+        x = x[unique_index,]
+        y = y[unique_index,]
 
         # x = torch.cat(FullGatherLayer.apply(x), dim=0)
         # y = torch.cat(FullGatherLayer.apply(y), dim=0)
