@@ -28,7 +28,10 @@ class VICReg(nn.Module):
         self.args = args
         self.num_features = int(self.args.projector_mlp.split("-")[-1])
         self.projector_a = Projector(self.args)
-        self.projector_i = Projector(self.args)
+        if self.args.same_projector:
+            self.projector_i = self.projector_a
+        else:
+            self.projector_i = Projector(self.args)
 
     def forward(self, x, y, ids):
         B = x.shape[0]
