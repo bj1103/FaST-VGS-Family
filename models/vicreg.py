@@ -23,9 +23,10 @@ class FullGatherLayer(torch.autograd.Function):
         return all_gradients[dist.get_rank()]
 
 class VICReg(nn.Module):
-    def __init__(self, args):
+    def __init__(self, args, pos='coarse'):
         super().__init__()
         self.args = args
+        self.pos = pos
         self.num_features = int(self.args.projector_mlp.split("-")[-1])
         self.projector_a = Projector(self.args)
         if self.args.same_projector:
@@ -64,10 +65,10 @@ class VICReg(nn.Module):
             self.num_features
         ) + off_diagonal(cov_y).pow_(2).sum().div(self.num_features)
 
-        loss = (
-            self.args.sim_coeff * repr_loss
-            + self.args.std_coeff * std_loss
-            + self.args.cov_coeff * cov_loss
-        )
+        loss = {
+            f'{self.pos}_sim_loss' : repr_loss,
+            f'{self.pos}_std_loss' : std_loss,
+            f'{self.pos}_cov_loss' : cov_loss
+        }
         return loss
 

@@ -51,8 +51,8 @@ class Trainer:
         self.progress, self.total_progress = setup_progress(self)
         
         if self.args.solo_loss == 'VICReg':
-            self.solo_module_coarse = fast_vgs.VICReg(self.args).to(self.device)
-            self.solo_module_fine = fast_vgs.VICReg(self.args).to(self.device)
+            self.solo_module_coarse = fast_vgs.VICReg(self.args, 'coarse').to(self.device)
+            self.solo_module_fine = fast_vgs.VICReg(self.args, 'fine').to(self.device)
         elif self.args.solo_loss == 'BarlowTwins':
             self.solo_module_coarse = fast_vgs.BarlowTwins(self.args).to(self.device)
             self.solo_module_fine = fast_vgs.BarlowTwins(self.args).to(self.device)
@@ -86,7 +86,7 @@ class Trainer:
 
     def forward_solo(self, batch):
         audio_feats, audio_cls, extended_audio_attention_mask, visual_feats, visual_cls, losses = self.dual_encoder(audio_feats = batch['audio'], attention_mask = batch['audio_attention_mask'], visual_feats = batch['visual_feats'], visual_pos = batch['visual_pos'], target_list = batch['label'])
-        losses['coarse_matching_loss'] = self.solo_module_coarse(audio_cls, visual_cls, batch["img_id"])
+        losses = self.solo_module_coarse(audio_cls, visual_cls, batch["img_id"])
         
         if self.args.fine_matching_weight != 0:
             B = visual_feats.shape[0]
@@ -94,7 +94,7 @@ class Trainer:
             audio_feats_square = audio_feats.repeat_interleave(B, dim=0)
             extended_audio_attention_mask_square = extended_audio_attention_mask.repeat_interleave(B, dim=0)
             audio_cls, visual_cls = self.cross_encoder(audio_feats_square, extended_audio_attention_mask_square, visual_feats_square)
-            losses["fine_matching_loss"] = self.solo_module_fine(audio_cls, visual_cls)
+            losses = { **losses, **self.solo_module_fine(audio_cls, visual_cls)}
         return losses
     
     def train(self):
@@ -476,6 +476,9 @@ class Trainer:
     def _setup_meters(self):
         meters = {}
         meter_names = ['weighted_loss', "fine_matching_loss", "coarse_matching_loss", 'caption_w2v2_loss', "libri_w2v2_loss", "caption_hubert_loss", "libri_hubert_loss", "caption_m_acc", "libri_m_acc",'data_time', 'train_time']
+        if self.args.solo_loss:
+            solo_meter = ['coarse_sim_loss', 'coarse_std_loss', 'coarse_cov_loss', 'fine_sim_loss', 'fine_std_loss', 'fine_cov_loss']
+            meter_names += solo_meter
         for name in meter_names:
             meters[name] = AverageMeter()
         return meters
@@ -626,18 +629,23 @@ class Trainer:
         pass
 
     def weight_loss(self, losses):
-        weighted_loss = losses['coarse_matching_loss'] * self.args.coarse_matching_weight
-        if 'fine_matching_loss' in losses:
-            weighted_loss += losses['fine_matching_loss'] * self.args.fine_matching_weight
-        if 'caption_w2v2_loss' in losses:
-            weighted_loss += losses['caption_w2v2_loss'].mean() * self.args.caption_w2v2_weight
-        if 'libri_w2v2_loss' in losses:
-            weighted_loss += losses['libri_w2v2_loss'].mean() * self.args.libri_w2v2_weight
-        if 'caption_hubert_loss' in losses:
-            weighted_loss += losses['caption_hubert_loss'].mean() * self.args.caption_hubert_weight
-        if 'libri_hubert_loss' in losses:
-            weighted_loss += losses['libri_hubert_loss'].mean() * self.args.libri_hubert_weight
-        
+        if self.args.solo_loss:
+            weighted_loss = losses['coarse_sim_loss'] * self.args.sim_coeff + losses['coarse_std_loss'] * self.args.std_coeff + losses['coarse_cov_loss'] * self.args.cov_coeff
+            if self.args.fine_matching_weight != 0:
+                weighted_loss = losses['fine_sim_loss'] * self.args.sim_coeff + losses['fine_std_loss'] * self.args.std_coeff + losses['fine_cov_loss'] * self.args.cov_coeff
+        else:
+            weighted_loss = losses['coarse_matching_loss'] * self.args.coarse_matching_weight
+            if 'fine_matching_loss' in losses:
+                weighted_loss += losses['fine_matching_loss'] * self.args.fine_matching_weight
+            if 'caption_w2v2_loss' in losses:
+                weighted_loss += losses['caption_w2v2_loss'].mean() * self.args.caption_w2v2_weight
+            if 'libri_w2v2_loss' in losses:
+                weighted_loss += losses['libri_w2v2_loss'].mean() * self.args.libri_w2v2_weight
+            if 'caption_hubert_loss' in losses:
+                weighted_loss += losses['caption_hubert_loss'].mean() * self.args.caption_hubert_weight
+            if 'libri_hubert_loss' in losses:
+                weighted_loss += losses['libri_hubert_loss'].mean() * self.args.libri_hubert_weight
+            
         return weighted_loss
     
     def seed_everything(self, seed=1):
