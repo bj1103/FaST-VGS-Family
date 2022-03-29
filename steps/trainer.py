@@ -114,6 +114,10 @@ class Trainer:
                 self.dual_encoder.train()
                 if self.args.fine_matching_weight != 0:
                     self.cross_encoder.train()
+                if self.args.solo_loss:
+                    self.solo_module_coarse.train()
+                    self.solo_module_fine.train()
+
                 if self.progress['num_updates'] > self.total_num_updates:
                     flag = False
                     self.validate_and_save()
@@ -366,6 +370,7 @@ class Trainer:
                 
                 audio_feats, audio_cls, extended_audio_attention_mask, visual_feats, visual_cls = self.dual_encoder(audio_feats = batch['audio'].to(self.device), attention_mask = batch['audio_attention_mask'].to(self.device), visual_feats = batch['visual_feats'].to(self.device), visual_pos = batch['boxes'].to(self.device), test = True)
                 if self.args.solo_loss:
+                    self.solo_module_coarse.eval()
                     audio_cls = self.solo_module_coarse.projector_a(audio_cls)
                     visual_cls = self.solo_module_coarse.projector_i(visual_cls)
 
