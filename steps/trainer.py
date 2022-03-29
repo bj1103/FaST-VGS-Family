@@ -370,6 +370,7 @@ class Trainer:
             img_img_id_list = []
             img_cls_list = [] # this is distinct, order is the same as img_img_id_list
             img_feats_list = [] # this is distinct, order is the same as img_img_id_list
+            loss = {}
             for i, batch in enumerate(self.valid_loader):
                 self.dual_encoder.eval()
                 if self.args.fine_matching_weight != 0:
@@ -378,6 +379,12 @@ class Trainer:
                 audio_feats, audio_cls, extended_audio_attention_mask, visual_feats, visual_cls = self.dual_encoder(audio_feats = batch['audio'].to(self.device), attention_mask = batch['audio_attention_mask'].to(self.device), visual_feats = batch['visual_feats'].to(self.device), visual_pos = batch['boxes'].to(self.device), test = True)
                 if self.args.solo_loss:
                     self.solo_module_coarse.eval()
+                    loss_ = self.solo_module_coarse(audio_cls, visual_cls, batch["img_id"])
+                    for key in loss_.keys():
+                        if not loss.get(key):
+                            loss[key] = [loss_[key].item()]
+                        else:
+                            loss[key].append(loss_[key].item())
                     audio_cls = self.solo_module_coarse.projector_a(audio_cls)
                     visual_cls = self.solo_module_coarse.projector_i(visual_cls)
 
@@ -410,6 +417,10 @@ class Trainer:
                     score_i = torch.mean(score_i, dim=-1)
                     coarse_cross_relationship_score_matrix.append(score_i)
                 coarse_cross_relationship_score_matrix = torch.stack(coarse_cross_relationship_score_matrix) * -1
+                logger.info("Validloss:")
+                for key in loss:
+                    loss[key] = f"{np.mean(np.array(loss[key])):.4f}"
+                logger.info(loss)
             else:
                 coarse_cross_relationship_score_matrix = img_cls_list @ audio_cls_total.transpose(0,1)
             
