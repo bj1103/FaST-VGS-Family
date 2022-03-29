@@ -351,8 +351,11 @@ class Trainer:
         self.dual_encoder.eval()
         if self.args.fine_matching_weight != 0:
             self.cross_encoder.eval()
+        if self.args.solo_loss:
+            self.solo_module_coarse.eval()
+            self.solo_module_fine.eval()
         N_examples = self.valid_loader.dataset.__len__()
-
+        
         with torch.no_grad():
             # get single modal representations
             audio_feats_total = [] 
