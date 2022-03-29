@@ -460,9 +460,9 @@ class Trainer:
                 avg_acc_r5 = (recalls['A_r5'] + recalls['I_r5']) / 2
                 avg_acc_r1 = (recalls['A_r1'] + recalls['I_r1']) / 2
             else:
-                avg_acc_r10 = (recalls['A_r10'])
-                avg_acc_r5 = (recalls['A_r5'])
-                avg_acc_r1 = (recalls['A_r1'])
+                avg_acc_r10 = (recalls['A_r10'] + recalls['I_r10']) / 2
+                avg_acc_r5 = (recalls['A_r5'] + recalls['I_r5']) / 2
+                avg_acc_r1 = (recalls['A_r1'] + recalls['I_r1']) / 2
         self.writer.add_scalar("acc_r10", avg_acc_r10, self.progress['num_updates'])
         self.writer.add_scalar("acc_r5", avg_acc_r5, self.progress['num_updates'])
         self.writer.add_scalar("acc_r1", avg_acc_r1, self.progress['num_updates'])
