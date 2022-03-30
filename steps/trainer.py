@@ -395,11 +395,11 @@ class Trainer:
                 # visual_feats_total.append(visual_feats.detach())
                 detached_visual_feats = visual_feats.detach()
                 audio_img_id_total.append(batch['img_id'])
-                for i, img_id in enumerate(batch['img_id']):
+                for j, img_id in enumerate(batch['img_id']):
                     if img_id not in img_id_to_img_feats:
-                        img_id_to_img_feats[img_id] = detached_visual_feats[i]
-                        img_feats_list.append(detached_visual_feats[i])
-                        img_cls_list.append(visual_cls[i].detach())
+                        img_id_to_img_feats[img_id] = detached_visual_feats[j]
+                        img_feats_list.append(detached_visual_feats[j])
+                        img_cls_list.append(visual_cls[j].detach())
                         img_img_id_list.append(img_id)
 
             audio_cls_total = torch.cat(audio_cls_total)
@@ -414,7 +414,11 @@ class Trainer:
                 for i in range(len(img_cls_list)):
                     img_cls_i = torch.stack([img_cls_list[i] for j in range(len(audio_cls_total))])
                     score_i = F.mse_loss(img_cls_i, audio_cls_total, reduction='none')
+                    # print('index : ', img_img_id_list[i])
+                    # print(img_cls_i)
                     score_i = torch.mean(score_i, dim=-1)
+                    # print(score_i.topk(100))
+                    # print('')
                     coarse_cross_relationship_score_matrix.append(score_i)
                 coarse_cross_relationship_score_matrix = torch.stack(coarse_cross_relationship_score_matrix) * -1
                 logger.info("Validloss:")
