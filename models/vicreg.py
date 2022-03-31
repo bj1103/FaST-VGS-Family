@@ -42,9 +42,9 @@ class VICReg(nn.Module):
         repr_loss = F.mse_loss(x, y)
         unique_id = set()
         unique_index = []
-        for i, id in enumerate(ids):
-            if id not in unique_id:
-                unique_id.add(id)
+        for i, img_id in enumerate(ids):
+            if img_id not in unique_id:
+                unique_id.add(img_id)
                 unique_index.append(i)
         
         x = x[unique_index,]

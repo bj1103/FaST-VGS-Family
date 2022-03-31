@@ -39,7 +39,7 @@ if args.resume:
             old_args[key] = new_args[key]
     args = argparse.Namespace(**old_args)
     args.resume = resume
-else:
+elif not args.validate:
     print("\nexp_dir: %s" % args.exp_dir)
     with open("%s/args.pkl" % args.exp_dir, "wb") as f:
         pickle.dump(args, f)
