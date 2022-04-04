@@ -35,7 +35,10 @@ def setup_progress(self):
     """
     progress = {}
     progress['best_step'] = 1
-    progress['best_acc'] = - np.inf
+    if self.args.solo_loss:
+        progress['best_acc'] = np.inf
+    else:
+        progress['best_acc'] = - np.inf
     progress['best_libri_val_loss'] = np.inf
     progress['num_updates'] = 1
     progress['epoch'] = 1

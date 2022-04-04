@@ -3,7 +3,7 @@ import argparse
 import os
 import pickle
 import time
-from steps import trainer
+from steps import trainer, solo_trainer
 from models import fast_vgs, w2v2_model
 from datasets import flickr8k_dataset, libri_dataset
 from logging import getLogger
@@ -47,10 +47,17 @@ args.places = False
 args.flickr8k = True
 logger.info(args)
 
-
-if args.validate:
-    my_trainer = trainer.Trainer(args)
-    my_trainer.validate_one_to_many(my_trainer.valid_loader)
+if args.solo_loss:
+    if args.validate:
+        my_trainer = solo_trainer.Trainer(args)
+        my_trainer.validate_one_to_many(my_trainer.valid_loader)
+    else:
+        my_trainer = solo_trainer.Trainer(args)
+        my_trainer.train()
 else:
-    my_trainer = trainer.Trainer(args)
-    my_trainer.train()
+    if args.validate:
+        my_trainer = trainer.Trainer(args)
+        my_trainer.validate_one_to_many(my_trainer.valid_loader)
+    else:
+        my_trainer = trainer.Trainer(args)
+        my_trainer.train()
