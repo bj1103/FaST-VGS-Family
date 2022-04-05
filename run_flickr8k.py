@@ -17,8 +17,7 @@ parser.add_argument("--resume", action="store_true", dest="resume", help="load f
 parser.add_argument("--validate", action="store_true", default=False, help="temp, if call trainer_variants rather than trainer")
 parser.add_argument("--test", action="store_true", default=False, help="test the model on test set")
 
-
-trainer.Trainer.add_args(parser)
+solo_trainer.Trainer.add_args(parser)
 w2v2_model.Wav2Vec2Model_cls.add_args(parser)
 fast_vgs.DualEncoder.add_args(parser)
 flickr8k_dataset.ImageCaptionDataset.add_args(parser)
