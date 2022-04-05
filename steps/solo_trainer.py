@@ -283,7 +283,7 @@ class Trainer:
                     audio_feats_square = audio_feats.repeat_interleave(B, dim=0)
                     extended_audio_attention_mask_square = extended_audio_attention_mask.repeat_interleave(B, dim=0)
                     audio_cls, visual_cls = self.cross_encoder(audio_feats_square, extended_audio_attention_mask_square, visual_feats_square)
-                    cross_loss = self.solo_module_fine(audio_cls, visual_cls)
+                    cross_loss = self.solo_module_fine(audio_cls, visual_cls, batch["img_id"])
                     for key, item in cross_loss.items():
                         losses[key] = item     
                 for key in losses.keys():
