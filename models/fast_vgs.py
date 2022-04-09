@@ -22,7 +22,7 @@ import numpy as np
 import torch
 from torch import nn
 from .w2v2_model import  Wav2Vec2Model_cls
-from .utils import w2v2_loss, Margin_InfoNCE_loss, VisualFeatEncoder, BertLayer, LXMERTXLayer
+from .utils import w2v2_loss, Margin_InfoNCE_loss, VisualFeatEncoder, BertLayer, LXMERTXLayer, DCL
 from .vicreg import VICReg
 from .barlow_twins import BarlowTwins
 import logging

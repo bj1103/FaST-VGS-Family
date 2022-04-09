@@ -78,6 +78,18 @@ def Margin_InfoNCE_loss(S, margin, img_id=None):
     loss = I2C_loss + C2I_loss
     return loss
 
+def DCL(S, margin, img_id=None):
+    deltas = margin * torch.eye(S.size(0)).to(S.device)
+    positive_loss = -torch.diag(S - deltas) / 0.1
+    # if z1 is not None:
+    #     weight_fn = 2 - z1.size(0) * torch.nn.functional.softmax((z1 * z2).sum(dim=1) / 0.5, dim=0).squeeze()
+    #     positive_loss = weight_fn * positive_loss
+
+    very_neg = torch.tensor(-10000.).to(S)
+    neg_mask = torch.from_numpy((img_id[:,None] == img_id[None,:])).to(S)
+    
+    negative_loss = torch.logsumexp(S / 0.1 + neg_mask * very_neg, dim=1, keepdim=False)
+    return (positive_loss + negative_loss).mean()
 
 # model modules and functions
 
