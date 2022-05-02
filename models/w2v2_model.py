@@ -719,7 +719,6 @@ class Wav2Vec2Model_cls(BaseFairseqModel):
         1) Take care of DataParallel/nn.Module state_dict
         2) Show keys that are not loaded due to size mismatch or not found in model
         """
-        print('====== here is fb model start ======')
         new_states = self.state_dict()
         loaded_keys = []
         for k, v in states.items():
@@ -739,8 +738,6 @@ class Wav2Vec2Model_cls(BaseFairseqModel):
                 print('  %s' % k)
         
         self.load_state_dict(new_states)
-        print('====== here is fb model end ======')
-
 
 
 class ConvFeatureExtractionModel(nn.Module):

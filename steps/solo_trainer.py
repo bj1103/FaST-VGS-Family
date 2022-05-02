@@ -35,13 +35,11 @@ class Trainer:
         parser.add_argument("--grad_accum", type=int, default=1)
         parser.add_argument("--projector_mlp", type=str, default="1536-1536", help="Size and number of layers of the MLP expander head")
         parser.add_argument("--same_projector", action="store_true", default=True, help="Same projector for audio and image")
-        parser.add_argument("--sim_coeff_coarse", type=float, default=2.5, help="Coarse invariance regularization loss coefficient for VICReg")
-        parser.add_argument("--std_coeff_coarse", type=float, default=2.5, help="Coarse variance regularization loss coefficient for VICReg")
-        parser.add_argument("--cov_coeff_coarse", type=float, default=0.1, help="Coarse covariance regularization loss coefficient for VICReg")
-        parser.add_argument("--sim_coeff_fine", type=float, default=25.0, help="Fine invariance regularization loss coefficient for VICReg")
-        parser.add_argument("--std_coeff_fine", type=float, default=25.0, help="Fine variance regularization loss coefficient for VICReg")
-        parser.add_argument("--cov_coeff_fine", type=float, default=1.0, help="Fine covariance regularization loss coefficient for VICReg")
-        parser.add_argument("--lambd", type=float, default=0.0051, help="Weight on off-diagonal terms for barlow twins")
+        parser.add_argument("--sim_coeff_coarse", type=float, default=25.0, help="Coarse invariance regularization loss coefficient for VICReg")
+        parser.add_argument("--std_coeff_coarse", type=float, default=25.0, help="Coarse variance regularization loss coefficient for VICReg")
+        parser.add_argument("--cov_coeff_coarse", type=float, default=1.0, help="Coarse covariance regularization loss coefficient for VICReg")
+        parser.add_argument("--on_diag_weight", type=float, default=0.001, help="Weight on off-diagonal terms for barlow twins")
+        parser.add_argument("--off_diag_weight", type=float, default=0.000051, help="Weight on off-diagonal terms for barlow twins")
     
     def __init__(self, args):
         self.start_time = time.time()
@@ -55,10 +53,10 @@ class Trainer:
         
         if self.args.solo_loss == 'VICReg':
             self.solo_module_coarse = fast_vgs.VICReg(self.args, 'coarse').to(self.device)
-            self.solo_module_fine = fast_vgs.VICReg(self.args, 'fine').to(self.device)
+            # self.solo_module_fine = fast_vgs.VICReg(self.args, 'fine').to(self.device)
         elif self.args.solo_loss == 'BarlowTwins':
             self.solo_module_coarse = fast_vgs.BarlowTwins(self.args).to(self.device)
-            self.solo_module_fine = fast_vgs.BarlowTwins(self.args).to(self.device)
+            # self.solo_module_fine = fast_vgs.BarlowTwins(self.args).to(self.device)
            
         self.dual_encoder, self.cross_encoder, self.trainables, self.indices, self.libri_indices, self.optim_states = self._setup_models()
         self.use_libri_loss = self.args.libri_w2v2_weight != None
@@ -89,16 +87,19 @@ class Trainer:
 
     def forward_solo(self, batch):
         audio_feats, audio_cls, extended_audio_attention_mask, visual_feats, visual_cls, losses = self.dual_encoder(audio_feats = batch['audio'], attention_mask = batch['audio_attention_mask'], visual_feats = batch['visual_feats'], visual_pos = batch['visual_pos'], target_list = batch['label'])
-        losses = self.solo_module_coarse(audio_cls, visual_cls, batch["img_id"])
-        if self.args.fine_matching_weight:
+        losses = self.solo_module_coarse(audio_cls, visual_cls, batch["img_id"])        
+        if self.args.coarse_matching_weight:
+            coarse_cross_relationship_score_matrix = visual_cls @ audio_cls.transpose(0,1)
+            losses['coarse_matching_loss'] = fast_vgs.Margin_InfoNCE_loss(coarse_cross_relationship_score_matrix, margin=self.args.margin, img_id = batch['img_id'])
+
+        if self.args.fine_matching_weight != 0:
             B = visual_feats.shape[0]
             visual_feats_square = visual_feats.repeat(B,1,1)
             audio_feats_square = audio_feats.repeat_interleave(B, dim=0)
             extended_audio_attention_mask_square = extended_audio_attention_mask.repeat_interleave(B, dim=0)
-            audio_cls, visual_cls = self.cross_encoder(audio_feats_square, extended_audio_attention_mask_square, visual_feats_square)
-            cross_loss = self.solo_module_fine(audio_cls, visual_cls, batch["img_id"])
-            for key, item in cross_loss.items():
-                losses[key] = item
+            cross_relationship_score_square = self.cross_encoder(audio_feats_square, extended_audio_attention_mask_square, visual_feats_square)
+            cross_relationship_score_matrix = cross_relationship_score_square.view(B,B)
+            losses["fine_matching_loss"] = fast_vgs.Margin_InfoNCE_loss(cross_relationship_score_matrix, margin=self.args.margin, img_id = batch['img_id'])
         return losses
     
     def train(self):
@@ -118,7 +119,7 @@ class Trainer:
                     self.cross_encoder.train()
                 if self.args.solo_loss:
                     self.solo_module_coarse.train()
-                    self.solo_module_fine.train()
+                    # self.solo_module_fine.train()
 
                 if self.progress['num_updates'] > self.total_num_updates:
                     flag = False
@@ -194,22 +195,20 @@ class Trainer:
             self.cross_encoder.eval()
         if self.args.solo_loss:
             self.solo_module_coarse.eval()
-            self.solo_module_fine.eval()
+            # self.solo_module_fine.eval()
         if places:
             r10, r5, r1 = self.validate(self.valid_loader)
             r10_unseen, r5_unseen, r1_unseen = self.validate(self.valid_loader2, unseen=True)
             r10, r5, r1 = (r10+r10_unseen)/2, (r5+r5_unseen)/2, (r1+r1_unseen)/2
         else:
-            loss = self.validate_one_to_many()
+            r10, r5, r1 = self.validate_one_to_many()
         
         if libri:
             self.validate_libri()
-        # r1 = 0.1 # ignore validation, for debugging
-        weighted_loss = self.weight_loss(loss)
-        logger.info(f"weighted loss {weighted_loss}")
-        if weighted_loss < self.progress['best_acc']:
+         # r1 = 0.1 # ignore validation, for debugging
+        if r1 > self.progress['best_acc']:
             self.progress['best_epoch'] = self.progress['epoch']
-            self.progress['best_acc'] = weighted_loss
+            self.progress['best_acc'] = r1
             save_path = os.path.join(self.args.exp_dir,"best_bundle.pth")
             save_dict = {
                 "dual_encoder": self.dual_encoder.module.state_dict() if torch.cuda.device_count() > 1 else self.dual_encoder.state_dict(),
@@ -218,12 +217,12 @@ class Trainer:
                 "libri_indices": self.libri_train_sampler.state_dict() if self.libri_train_sampler is not None else None
             }
             if self.args.fine_matching_weight != 0:
-                if self.args.solo_loss:
-                    save_dict["solo_module_fine"] = self.solo_module_fine.module.state_dict()  if torch.cuda.device_count() > 1 else self.solo_module_fine.state_dict()
+                # if self.args.solo_loss:
+                #     save_dict["solo_module_fine"] = self.solo_module_fine.state_dict()
                 save_dict["cross_encoder"] = self.cross_encoder.module.state_dict() if torch.cuda.device_count() > 1 else self.cross_encoder.state_dict()
                 
             if self.args.solo_loss:
-                save_dict["solo_module_coarse"] = self.solo_module_coarse.module.state_dict() if torch.cuda.device_count() > 1 else self.solo_module_coarse.state_dict()
+                save_dict["solo_module_coarse"] = self.solo_module_coarse.state_dict()
 
             torch.save(save_dict, save_path)
             logger.info(f"save *best* models at {save_path} at global step {self.progress['num_updates']}")
@@ -236,12 +235,12 @@ class Trainer:
             "libri_indices": self.libri_train_sampler.state_dict() if self.libri_train_sampler is not None else None
         }
         if self.args.fine_matching_weight != 0:
-            if self.args.solo_loss:
-                save_dict["solo_module_fine"] = self.solo_module_fine.module.state_dict()  if torch.cuda.device_count() > 1 else self.solo_module_fine.state_dict()
+            # if self.args.solo_loss:
+            #     save_dict["solo_module_fine"] = self.solo_module_fine.state_dict()
             save_dict["cross_encoder"] = self.cross_encoder.module.state_dict() if torch.cuda.device_count() > 1 else self.cross_encoder.state_dict()
             
         if self.args.solo_loss:
-            save_dict["solo_module_coarse"] = self.solo_module_coarse.module.state_dict() if torch.cuda.device_count() > 1 else self.solo_module_coarse.state_dict()
+            save_dict["solo_module_coarse"] = self.solo_module_coarse.state_dict()
 
         torch.save(save_dict, save_path)
         logger.info(f"save models, indices, acc and other statistics at {save_path} and {self.args.exp_dir}/progress.pkl at global step {self.progress['num_updates']}")
@@ -253,7 +252,7 @@ class Trainer:
             self.cross_encoder.eval()
         if self.args.solo_loss:
             self.solo_module_coarse.eval()
-            self.solo_module_fine.eval()
+            # self.solo_module_fine.eval()
 
         N_examples = self.valid_loader.dataset.__len__()
 
@@ -273,28 +272,111 @@ class Trainer:
                 self.solo_module_coarse.eval()
                 if self.args.fine_matching_weight != 0:
                     self.cross_encoder.eval()
-                    self.solo_module_fine.eval()
+                    # self.solo_module_fine.eval()
                 
                 audio_feats, audio_cls, extended_audio_attention_mask, visual_feats, visual_cls = self.dual_encoder(audio_feats = batch['audio'].to(self.device), attention_mask = batch['audio_attention_mask'].to(self.device), visual_feats = batch['visual_feats'].to(self.device), visual_pos = batch['boxes'].to(self.device), test = True)
-                losses = self.solo_module_coarse(audio_cls, visual_cls, batch["img_id"])
-                if self.args.fine_matching_weight:
-                    B = visual_feats.shape[0]
-                    visual_feats_square = visual_feats.repeat(B,1,1)
-                    audio_feats_square = audio_feats.repeat_interleave(B, dim=0)
-                    extended_audio_attention_mask_square = extended_audio_attention_mask.repeat_interleave(B, dim=0)
-                    audio_cls, visual_cls = self.cross_encoder(audio_feats_square, extended_audio_attention_mask_square, visual_feats_square)
-                    cross_loss = self.solo_module_fine(audio_cls, visual_cls, batch["img_id"])
-                    for key, item in cross_loss.items():
-                        losses[key] = item     
+                losses = self.solo_module_coarse(audio_cls, visual_cls, batch["img_id"])  
                 for key in losses.keys():
                     if not loss.get(key):
                         loss[key] = [losses[key].item()]
                     else:
                         loss[key].append(losses[key].item())
+                
+                
+                # if self.args.solo_loss == 'VICReg':
+                #     audio_cls = self.solo_module_coarse.projector_a(audio_cls)
+                #     visual_cls = self.solo_module_coarse.projector_i(visual_cls)
+
+                audio_cls_total.append(audio_cls)
+                # visual_cls_total.append(visual_cls)
+                audio_feats_total.append(audio_feats.detach()) # still on cude after .detach(), just removed from graph, so no gradient
+                extended_audio_attention_mask_total.append(extended_audio_attention_mask.detach())
+                # visual_feats_total.append(visual_feats.detach())
+                detached_visual_feats = visual_feats.detach()
+                audio_img_id_total.append(batch['img_id'])
+                for j, img_id in enumerate(batch['img_id']):
+                    if img_id not in img_id_to_img_feats:
+                        img_id_to_img_feats[img_id] = detached_visual_feats[j]
+                        img_feats_list.append(detached_visual_feats[j])
+                        img_cls_list.append(visual_cls[j].detach())
+                        img_img_id_list.append(img_id)
+
+            audio_cls_total = torch.cat(audio_cls_total)
+            img_cls_list = torch.stack(img_cls_list)
+            img_feats_list = torch.stack(img_feats_list)
+            audio_feats_total = torch.cat(audio_feats_total)
+            extended_audio_attention_mask_total = torch.cat(extended_audio_attention_mask_total)
+            audio_img_id_total = np.concatenate(audio_img_id_total)
+            img_img_id_list = np.array(img_img_id_list)
+            # if self.args.solo_loss == 'VICReg':
+            #     coarse_cross_relationship_score_matrix = []
+            #     for i in range(len(img_cls_list)):
+            #         img_cls_i = torch.stack([img_cls_list[i] for j in range(len(audio_cls_total))])
+            #         score_i = F.mse_loss(img_cls_i, audio_cls_total, reduction='none')
+            #         score_i = torch.mean(score_i, dim=-1)
+            #         coarse_cross_relationship_score_matrix.append(score_i)
+            #     coarse_cross_relationship_score_matrix = torch.stack(coarse_cross_relationship_score_matrix) * -1
+            # else:
+            coarse_cross_relationship_score_matrix = img_cls_list @ audio_cls_total.transpose(0,1)
+            
+            recalls = calc_recalls_from_S_one_to_many_coarse(coarse_cross_relationship_score_matrix, row_img_id=img_img_id_list, column_img_id=audio_img_id_total)
+            avg_acc_coarse = (recalls['A_r10'] + recalls['I_r10']) / 2
+            avg_acc_r1_coarse = (recalls['A_r1'] + recalls['I_r1']) / 2
+            self.writer.add_scalar("acc_coarse", avg_acc_coarse, self.progress['num_updates'])
+            self.writer.add_scalar("acc_r1_coarse", avg_acc_r1_coarse, self.progress['num_updates'])
+            logger.info("Coarse Retrieval Accuracy:")
+            logger.info('Audio R@100 {A_r100:.3f} Image R@100 {I_r100:.3f} Average R@100 {r100_ave:.3f} over {N:d} validation pairs'.format(A_r100=recalls['A_r100'], I_r100=recalls['I_r100'], r100_ave=(recalls['A_r100']+recalls['I_r100'])/2, N=N_examples))
+            logger.info('Audio R@10 {A_r10:.3f} Image R@10 {I_r10:.3f} Average R@10 {r10_ave:.3f} over {N:d} validation pairs'.format(A_r10=recalls['A_r10'], I_r10=recalls['I_r10'], r10_ave=(recalls['A_r10']+recalls['I_r10'])/2, N=N_examples))
+            logger.info('Audio R@5 {A_r5:.3f} Image R@5 {I_r5:.3f} Average R@5 {r5_ave:.3f} over {N:d} validation pairs'.format(A_r5=recalls['A_r5'], I_r5=recalls['I_r5'], r5_ave=(recalls['A_r5']+recalls['I_r5'])/2, N=N_examples))
+            logger.info('Audio R@1 {A_r1:.3f} Image R@1 {I_r1:.3f} Average R@1 {ave_r1:.3f} over {N:d} validation pairs'.format(A_r1=recalls['A_r1'], I_r1=recalls['I_r1'], ave_r1=(recalls['A_r1']+recalls['I_r1'])/2,  N=N_examples))
+            
+            if self.args.fine_matching_weight != 0:
+                if self.args.coarse_to_fine_retrieve:
+                    visual_indices, audio_indices = coarse_retrieve_one_to_many(coarse_cross_relationship_score_matrix.transpose(0,1), topk=self.args.topk) # transpose to have [audio_len, visual_len]
+                    B = len(visual_indices)
+                    val_cross_batch_size = self.args.val_cross_batch_size
+                    num_steps = math.ceil(B / val_cross_batch_size)
+                    cross_relationship_score_square = []
+                    for i in tqdm(range(num_steps), disable=hide_progress):
+                        visual_feats_square = img_feats_list[visual_indices[i*val_cross_batch_size:(i+1)*val_cross_batch_size]].to(self.device)
+                        audio_feats_square = audio_feats_total[audio_indices[i*val_cross_batch_size:(i+1)*val_cross_batch_size]].to(self.device)
+                        extended_audio_attention_mask_square = extended_audio_attention_mask_total[audio_indices[i*val_cross_batch_size:(i+1)*val_cross_batch_size]].to(self.device)
+                        cross_relationship_score = self.cross_encoder(audio_feats_square, extended_audio_attention_mask_square, visual_feats_square, extended_visual_attention_mask_square=None)
+                        cross_relationship_score_square.append(cross_relationship_score.detach())
+
+                    # do not test visual encoder ability here, might consider doing it in the future
+                    # visual_feats = visual_feats_square[::(B+1)][:,1:]
+                    cross_relationship_score_square = torch.cat(cross_relationship_score_square)
+                # logger.info(f"validation cross relationship score data type: {cross_relationship_score_square.dtype}")
+                    recalls = fine_retrieve_one_to_many(cross_relationship_score_square, audio_img_id=audio_img_id_total, visual_img_id=img_img_id_list, visual_indices = visual_indices, audio_indices = audio_indices, topk=self.args.topk)
+                else:
+                    cross_relationship_score_matrix = torch.zeros((len(img_img_id_list), audio_feats_total.shape[0])).to(self.device)
+                    for i, img_id in enumerate(tqdm(img_img_id_list, disable=hide_progress)):
+                        visual_feats_cur = img_id_to_img_feats[img_id].unsqueeze(0).repeat(audio_feats_total.shape[0],1,1)
+                        # B = audio_feats_total.shape[0]
+                        temp = self.cross_encoder(audio_feats_total, extended_audio_attention_mask_total, visual_feats_cur, None)
+                        cross_relationship_score_matrix[i,:] = temp.squeeze(1)
+                    recalls = calc_recalls_from_S_one_to_many(cross_relationship_score_matrix, row_img_id=img_img_id_list, column_img_id=audio_img_id_total)
+
+                logger.info("Fine Retrieval Accuracy:")
+                logger.info('Audio R@10 {A_r10:.3f} Image R@10 {I_r10:.3f} Average R@10 {r10_ave:.3f} over {N:d} validation pairs'.format(A_r10=recalls['A_r10'], I_r10=recalls['I_r10'], r10_ave=(recalls['A_r10']+recalls['I_r10'])/2, N=N_examples))
+                logger.info('Audio R@5 {A_r5:.3f} Image R@5 {I_r5:.3f} Average R@5 {r5_ave:.3f} over {N:d} validation pairs'.format(A_r5=recalls['A_r5'], I_r5=recalls['I_r5'], r5_ave=(recalls['A_r5']+recalls['I_r5'])/2, N=N_examples))
+                logger.info('Audio R@1 {A_r1:.3f} Image R@1 {I_r1:.3f} Average R@1 {ave_r1:.3f} over {N:d} validation pairs'.format(A_r1=recalls['A_r1'], I_r1=recalls['I_r1'], ave_r1=(recalls['A_r1']+recalls['I_r1'])/2,  N=N_examples))
+
+                avg_acc_r10 = (recalls['A_r10'] + recalls['I_r10']) / 2
+                avg_acc_r5 = (recalls['A_r5'] + recalls['I_r5']) / 2
+                avg_acc_r1 = (recalls['A_r1'] + recalls['I_r1']) / 2
+            else:
+                avg_acc_r10 = (recalls['A_r10'] + recalls['I_r10']) / 2
+                avg_acc_r5 = (recalls['A_r5'] + recalls['I_r5']) / 2
+                avg_acc_r1 = (recalls['A_r1'] + recalls['I_r1']) / 2
+            self.writer.add_scalar("acc_r10", avg_acc_r10, self.progress['num_updates'])
+            self.writer.add_scalar("acc_r5", avg_acc_r5, self.progress['num_updates'])
+            self.writer.add_scalar("acc_r1", avg_acc_r1, self.progress['num_updates'])
             for key in loss:
                 loss[key] = np.mean(np.array(loss[key]))
             logger.info(loss)
-        return loss
+        return avg_acc_r10, avg_acc_r5, avg_acc_r1
         
     def validate_libri(self):
         with torch.no_grad():
@@ -317,7 +399,7 @@ class Trainer:
 
     def _setup_meters(self):
         meters = {}
-        meter_names = ['weighted_loss', "fine_matching_loss", "coarse_matching_loss", 'coarse_sim_loss', 'coarse_std_loss', 'coarse_cov_loss', 'fine_sim_loss', 'fine_std_loss', 'fine_cov_loss', 'caption_w2v2_loss', "libri_w2v2_loss", "caption_hubert_loss", "libri_hubert_loss", "caption_m_acc", "libri_m_acc",'data_time', 'train_time']
+        meter_names = ['weighted_loss', "on_diag", "off_diag", "fine_matching_loss", "coarse_matching_loss", 'coarse_sim_loss', 'coarse_std_loss', 'coarse_cov_loss', 'fine_sim_loss', 'fine_std_loss', 'fine_cov_loss', 'caption_w2v2_loss', "libri_w2v2_loss", "caption_hubert_loss", "libri_hubert_loss", "caption_m_acc", "libri_m_acc",'data_time', 'train_time']
 
         for name in meter_names:
             meters[name] = AverageMeter()
@@ -333,9 +415,9 @@ class Trainer:
             dual_encoder.carefully_load_state_dict(bundle['dual_encoder'])
             if self.args.fine_matching_weight != 0:
                 cross_encoder.carefully_load_state_dict(bundle['cross_encoder'])
-                if self.args.solo_loss:
-                    self.solo_module_fine.load_state_dict(bundle['solo_module_fine'])
-            if self.args.solo_loss:
+                # if self.args.solo_loss:
+                #     self.solo_module_fine.load_state_dict(bundle['solo_module_fine'])
+            if self.args.solo_loss and bundle.get('solo_module_coarse'):
                 self.solo_module_coarse.load_state_dict(bundle['solo_module_coarse'])
             indices = None
             libri_indices = None
@@ -347,8 +429,8 @@ class Trainer:
             dual_encoder.carefully_load_state_dict(bundle['dual_encoder'])
             if self.args.fine_matching_weight != 0:
                 cross_encoder.carefully_load_state_dict(bundle['cross_encoder'])
-                if self.args.solo_loss:
-                    self.solo_module_fine.load_state_dict(bundle['solo_module_fine'])
+                # if self.args.solo_loss:
+                #     self.solo_module_fine.load_state_dict(bundle['solo_module_fine'])
             if self.args.solo_loss:
                 self.solo_module_coarse.load_state_dict(bundle['solo_module_coarse'])
             indices = None
@@ -361,8 +443,8 @@ class Trainer:
             dual_encoder.carefully_load_state_dict(bundle['dual_encoder'])
             if self.args.fine_matching_weight != 0:
                 cross_encoder.carefully_load_state_dict(bundle['cross_encoder'])
-                if self.args.solo_loss:
-                    self.solo_module_fine.load_state_dict(bundle['solo_module_fine'])
+                # if self.args.solo_loss:
+                    # self.solo_module_fine.load_state_dict(bundle['solo_module_fine'])
             if self.args.solo_loss:
                 self.solo_module_coarse.load_state_dict(bundle['solo_module_coarse'])
             indices = bundle['indices']
@@ -386,8 +468,8 @@ class Trainer:
         trainables = trainables1 + trainables2
         if self.args.solo_loss:
             trainables3 = [p for p in self.solo_module_coarse.parameters() if p.requires_grad]
-            trainables4 = [p for p in self.solo_module_fine.parameters() if p.requires_grad]
-            trainables += trainables3 + trainables4
+            # trainables4 = [p for p in self.solo_module_fine.parameters() if p.requires_grad]
+            trainables += trainables3
 
         dual_encoder.to(self.device)
         if self.args.fine_matching_weight != 0:
@@ -470,9 +552,10 @@ class Trainer:
 
     def weight_loss(self, losses):
         if self.args.solo_loss:
-            weighted_loss = losses['coarse_sim_loss'] * self.args.sim_coeff_coarse + losses['coarse_std_loss'] * self.args.std_coeff_coarse + losses['coarse_cov_loss'] * self.args.cov_coeff_coarse
-            if self.args.fine_matching_weight != 0:
-                weighted_loss += losses['fine_sim_loss'] * self.args.sim_coeff_fine + losses['fine_std_loss'] * self.args.std_coeff_fine + losses['fine_cov_loss'] * self.args.cov_coeff_fine
+            if self.args.solo_loss == 'VICReg':
+                weighted_loss = losses['coarse_sim_loss'] * self.args.sim_coeff_coarse + losses['coarse_std_loss'] * self.args.std_coeff_coarse + losses['coarse_cov_loss'] * self.args.cov_coeff_coarse
+            elif self.args.solo_loss == 'BarlowTwins':
+                weighted_loss = self.args.on_diag_weight * losses['on_diag'] + self.args.off_diag_weight * losses['off_diag']
             if 'coarse_matching_loss' in losses:
                 weighted_loss += losses['coarse_matching_loss'] * self.args.coarse_matching_weight
             if 'fine_matching_loss' in losses:

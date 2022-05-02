@@ -22,7 +22,7 @@ import numpy as np
 import torch
 from torch import nn
 from .w2v2_model import  Wav2Vec2Model_cls
-from .utils import w2v2_loss, Margin_InfoNCE_loss, VisualFeatEncoder, BertLayer, LXMERTXLayer, DCL
+from .utils import w2v2_loss, Margin_InfoNCE_loss, VisualFeatEncoder, BertLayer, LXMERTXLayer
 from .vicreg import VICReg
 from .barlow_twins import BarlowTwins
 import logging
@@ -368,13 +368,10 @@ class CrossEncoder(nn.Module):
             audio_feats_square, visual_feats_square = layer_module(
                 audio_feats_square, extended_audio_attention_mask_square, visual_feats_square, extended_visual_attention_mask_square
             )
-        if self.args.solo_loss:
-            return audio_feats_square[:,0], visual_feats_square[:,0]
-        else:
-            cls_token = torch.cat([audio_feats_square[:,0], visual_feats_square[:,0]], dim=-1)
-            cross_relationship_score_square = self.fc(cls_token)
-            return cross_relationship_score_square
-    def carefully_load_state_dict(self, states):
+        cls_token = torch.cat([audio_feats_square[:,0], visual_feats_square[:,0]], dim=-1)
+        cross_relationship_score_square = self.fc(cls_token)
+        return cross_relationship_score_square
+def carefully_load_state_dict(self, states):
         """
         1) Take care of DataParallel/nn.Module state_dict
         2) Show keys that are not loaded due to size mismatch or not found in model

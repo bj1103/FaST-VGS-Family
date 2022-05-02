@@ -631,7 +631,7 @@ def off_diagonal(x):
     return x.flatten()[:-1].view(n - 1, n + 1)[:, 1:].flatten()
 
 def Projector(args):
-    if args.projector_mlp:
+    if args.projector_mlp and len(args.projector_mlp):
         mlp_spec = f"{args.hidden_size}-{args.projector_mlp}"
         layers = []
         f = list(map(int, mlp_spec.split("-")))
