@@ -8,6 +8,10 @@ from torch.utils.data import Dataset
 import h5py
 import pickle
 import logging
+from transformers import BeitFeatureExtractor, BeitModel
+from PIL import Image
+import glob
+from tqdm import tqdm
 logger = logging.getLogger(__name__)
 
 
@@ -23,6 +27,7 @@ class ImageCaptionDataset(Dataset):
     def __init__(self, args, split = "train"):
         self.args = args
         self.split = split
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.audio_feat_len = args.audio_feat_len if "train" in split else args.val_audio_feat_len
         split_name = split.replace("val", "dev") if not self.args.test else "test" # just in case you input val, instead of dev
         audio_dataset_json_file = os.path.join(args.data_root, f"flickr8k_{split_name}.json")
@@ -33,12 +38,36 @@ class ImageCaptionDataset(Dataset):
         with open(audio_dataset_json_file, 'r') as fp:
             data_json = json.load(fp)
         self.data = data_json['data']
-        self.img_data = h5py.File(img_dataset_h5py_file, 'r')
-        with open(img_id2index_file, 'r') as fp:
-            self.img_id2index = json.load(fp)
-        with open(imgid2ordered_indices_file, 'rb') as f:
-            self.img_id2ordered_indices = pickle.load(f)
-
+        # self.img_data = h5py.File(img_dataset_h5py_file, 'r')
+        # with open(img_id2index_file, 'r') as fp:
+        #     self.img_id2index = json.load(fp)
+        # with open(imgid2ordered_indices_file, 'rb') as f:
+        #     self.img_id2ordered_indices = pickle.load(f)
+        self.img_id2index = {}
+        self.img_features = []
+        self.feature_extractor = BeitFeatureExtractor.from_pretrained(self.args.beit_model)
+        self.feature_model = BeitModel.from_pretrained(self.args.beit_model).to(self.device)
+        for index in tqdm(range(len(self.data))):
+            img_id = self.data[index]['image']
+            if self.img_id2index.get(img_id) == None:
+                self.img_id2index[img_id] = len(self.img_features)
+                img = np.asarray(Image.open(os.path.join(args.data_root, f'Images/{img_id}')))
+                self.img_features.append(img)
+        self.img_features = self.feature_extractor(images=self.img_features, return_tensors="pt")['pixel_values']
+        self.img_embeddings = []
+        self.feature_model.eval()
+        for i in tqdm(range(len(self.img_features))):
+            inputs = self.img_features[i].unsqueeze(dim=0).to(self.device)
+            embed = self.feature_model(pixel_values=inputs).last_hidden_state
+            self.img_embeddings.append(embed.squeeze(dim=0).cpu().detach())
+        print('img num : ', len(self.img_features))
+        # for index in tqdm(range(len(self.data))):
+        #     img_id = self.data[index]['image']
+        #     img = np.asarray(Image.open(os.path.join(args.data_root, f'Images/{img_id}')))
+        #     img_features = feature_extractor(images=img, return_tensors="pt")['pixel_values']
+        #     img = img_features.squeeze()
+        #     torch.save(img, os.path.join(args.data_root, f'processed_images/{img_id}'))
+        
     def _LoadAudio(self, path):
         x, sr = sf.read(path, dtype = 'float32')
         assert sr == 16000
@@ -65,16 +94,17 @@ class ImageCaptionDataset(Dataset):
         np.testing.assert_array_less(-boxes, 0+1e-5)
 
         return torch.from_numpy(self.img_data['features'][index][ordered_indices[:self.args.img_feat_len]]), torch.from_numpy(boxes)
- 
+
     def __getitem__(self, index):
         datum = self.data[index]
         img_id = datum['image']
         img_index = self.img_id2index[img_id]
-        ordered_indices = self.img_id2ordered_indices[img_id]
+        # ordered_indices = self.img_id2ordered_indices[img_id]
         wavpath = os.path.join(self.audio_base_path, "wavs", datum['wav'])
         audio, nframes = self._LoadAudio(wavpath)
-        mask_feats, boxes = self._LoadImage(img_index, ordered_indices)
-        return mask_feats, boxes, audio, nframes, img_id, datum['wav']
+        # mask_feats, boxes = self._LoadImage(img_index, ordered_indices)
+        img_feats = self.img_embeddings[img_index]
+        return img_feats, audio, nframes, img_id, datum['wav']
 
     def __len__(self):
         return len(self.data)
@@ -83,11 +113,11 @@ class ImageCaptionDataset(Dataset):
         vals = list(zip(*batch))
         collated = {}
         collated['visual_feats'] = torch.stack(vals[0])
-        collated['boxes'] = torch.stack(vals[1])
-        collated['audio'] = torch.nn.utils.rnn.pad_sequence(vals[2], batch_first=True)
-        collated['audio_length'] = torch.LongTensor(vals[3])
-        collated['img_id'] = np.array(vals[4])
-        collated['fn'] = vals[5]
+        # collated['boxes'] = torch.stack(vals[1])
+        collated['audio'] = torch.nn.utils.rnn.pad_sequence(vals[1], batch_first=True)
+        collated['audio_length'] = torch.LongTensor(vals[2])
+        collated['img_id'] = np.array(vals[3])
+        collated['fn'] = vals[4]
         collated['audio_attention_mask'] = torch.arange(len(collated['audio'][0])).unsqueeze(0) >= collated['audio_length'].unsqueeze(1)
         return collated
 

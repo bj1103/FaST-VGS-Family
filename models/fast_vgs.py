@@ -26,6 +26,8 @@ from .utils import w2v2_loss, Margin_InfoNCE_loss, VisualFeatEncoder, BertLayer,
 from .vicreg import VICReg
 from .barlow_twins import BarlowTwins
 import logging
+from transformers import BeitModel
+
 logger = logging.getLogger(__name__)
 
 def flatten_tensor(inputs):
@@ -191,7 +193,7 @@ class DualEncoder(nn.Module):
         parser.add_argument("--fb_w2v2_weights_fn", type=str, help="the path of w2v2 small model trained by FAIR", default=None)
         parser.add_argument("--margin", type=float, default=1.0)
         parser.add_argument("--topk", type=float, default=100)
-
+        parser.add_argument("--beit_model", type=str, default="microsoft/beit-base-patch16-224-pt22k")
     def __init__(self, args):
         super().__init__()
         self.args = args
@@ -218,15 +220,17 @@ class DualEncoder(nn.Module):
         self.trm2 = BertLayer(args)
         self.trm2_proj = nn.Linear(self.args.hidden_size, self.args.hidden_size)
 
-        self.visn_fc = VisualFeatEncoder(args)
+        # self.visn_fc = VisualFeatEncoder(args)
         self.visual_cls_token = torch.nn.Parameter(torch.randn((1, 1, args.hidden_size)), requires_grad=True)
         self.trm = nn.ModuleList([BertLayer(args) for _ in range(args.trm_layers)])
+        
+        # self.visn_encoder = BeitModel.from_pretrained(self.args.beit_model)
         self.visual_cls_token_proj_coarse = nn.Sequential(
             nn.Linear(self.args.hidden_size, self.args.hidden_size*2), 
             nn.GELU(), 
             nn.Linear(self.args.hidden_size*2, self.args.hidden_size)
         )
-
+        # self.fc = nn.Sequential(nn.Linear(self.args.hidden_size*2, self.args.hidden_size), nn.GELU(), nn.Linear(self.args.hidden_size,1))        
         self.apply(self.init_weights)
 
     def init_weights(self, module):
@@ -243,8 +247,13 @@ class DualEncoder(nn.Module):
     
 
     def forward_image(self, visual_feats, visual_pos, visual_attention_mask):
-        visual_feats = (visual_feats, visual_pos)
-        visual_feats = self.visn_fc(visual_feats)
+        # visual_feats = (visual_feats, visual_pos)
+        # outputs = self.visn_encoder(pixel_values=visual_feats)
+        # cls_token_coarse = self.visual_cls_token_proj_coarse(outputs.pooler_output)
+        # cls_token_coarse = outputs.pooler_output
+        # return outputs.last_hidden_state, cls_token_coarse
+        
+        # visual_feats = outputs.last_hidden_state
         visual_feats = torch.cat([self.visual_cls_token.repeat(visual_feats.shape[0],1,1), visual_feats], dim=1)
         for layer_module in self.trm:
             visual_feats = layer_module(visual_feats, None)
@@ -313,6 +322,12 @@ class DualEncoder(nn.Module):
         else:
             visual_feats, visual_cls= self.forward_image(visual_feats, visual_pos, visual_attention_mask)
             audio_feats, audio_cls, extended_audio_attention_mask, losses = self.forward_audio(audio_feats, attention_mask,target_list=target_list)
+            # B = visual_cls.shape[0]
+            # visual_cls_square = visual_cls.repeat(B,1)
+            # audio_cls_square = audio_cls.repeat_interleave(B, dim=0)
+            # cls_token = torch.cat([audio_cls_square, visual_cls_square], dim=-1)
+            # coarse_relationship_score_square = self.fc(cls_token)
+            # coarse_relationship_score_matrix = coarse_relationship_score_square.view(B,B)
             return audio_feats, audio_cls, extended_audio_attention_mask, visual_feats, visual_cls, losses
 
     def carefully_load_state_dict(self, states):

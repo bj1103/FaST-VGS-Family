@@ -73,7 +73,27 @@ class Trainer:
     def forward(self, batch):
         audio_feats, audio_cls, extended_audio_attention_mask, visual_feats, visual_cls, losses = self.dual_encoder(audio_feats = batch['audio'], attention_mask = batch['audio_attention_mask'], visual_feats = batch['visual_feats'], visual_pos = batch['visual_pos'], target_list = batch['label'])
         coarse_cross_relationship_score_matrix = visual_cls @ audio_cls.transpose(0,1)
+        cos = nn.CosineSimilarity(dim=-1)
+        # for i in range(len(batch['img_id'])):
+        #     print(f"cos sim between audio & image {batch['img_id'][i]} : {cos(audio_cls[i], visual_cls[i])}")
+        # print(coarse_cross_relationship_score_matrix)
+        # for i in range(len(batch['img_id'])):
+        #     for j in range(len(batch['img_id'])):
+        #         print(f"cos sim between image {batch['img_id'][i]}  & image {batch['img_id'][j]} : {cos(visual_cls[i], visual_cls[j])}")
+        #         for k in range(len(visual_feats[i])):
+        #             print(cos(visual_feats[i][k], visual_feats[j][k]).item(), end=' ')
+        # print()                
+        # for i in range(len(coarse_cross_relationship_score_matrix)):
+        #     print(i, coarse_cross_relationship_score_matrix[i][i], coarse_cross_relationship_score_matrix[i])
         losses['coarse_matching_loss'] = fast_vgs.Margin_InfoNCE_loss(coarse_cross_relationship_score_matrix, margin=self.args.margin, img_id = batch['img_id'])
+        # B = visual_cls.shape[0]
+        # visual_cls_square = visual_cls.repeat(B,1)
+        # audio_cls_square = audio_cls.repeat_interleave(B, dim=0)
+        # cls_token = torch.cat([audio_cls_square, visual_cls_square], dim=-1)
+        # coarse_relationship_score_square = self.dual_encoder.fc(cls_token)
+        # coarse_relationship_score_matrix = coarse_relationship_score_square.view(B,B)
+        # losses['coarse_matching_loss'] = fast_vgs.Margin_InfoNCE_loss(coarse_relationship_score_matrix, margin=self.args.margin, img_id = batch['img_id'])
+
         if self.args.fine_matching_weight != 0:
             B = visual_feats.shape[0]
             visual_feats_square = visual_feats.repeat(B,1,1)
@@ -131,7 +151,7 @@ class Trainer:
 
                 cur_batch = {
                         "visual_feats": batch['visual_feats'].to(self.device),
-                        "visual_pos": batch['boxes'].to(self.device),
+                        "visual_pos": None,
                         "audio": batch['audio'].to(self.device),
                         "audio_attention_mask": batch['audio_attention_mask'].to(self.device),
                         "img_id": batch['img_id'],
@@ -155,6 +175,10 @@ class Trainer:
                 self.writer.add_scalar('weighted_loss', weighted_loss.item(), self.progress['num_updates'])
 
                 weighted_loss.backward()
+                # for name, param in self.dual_encoder.named_parameters():
+                #     if param.requires_grad and param.grad != None:
+                #         print(name, param.grad.norm())
+                
                 torch.nn.utils.clip_grad_norm_(self.trainables, 1.)
                 if ((i + 1) % self.args.grad_accum == 0) or (i + 1 == len(self.train_loader)):
                     self.optimizer.step()
@@ -376,7 +400,7 @@ class Trainer:
                 if self.args.fine_matching_weight != 0:
                     self.cross_encoder.eval()
                 
-                audio_feats, audio_cls, extended_audio_attention_mask, visual_feats, visual_cls = self.dual_encoder(audio_feats = batch['audio'].to(self.device), attention_mask = batch['audio_attention_mask'].to(self.device), visual_feats = batch['visual_feats'].to(self.device), visual_pos = batch['boxes'].to(self.device), test = True)
+                audio_feats, audio_cls, extended_audio_attention_mask, visual_feats, visual_cls = self.dual_encoder(audio_feats = batch['audio'].to(self.device), attention_mask = batch['audio_attention_mask'].to(self.device), visual_feats = batch['visual_feats'].to(self.device), visual_pos = None, test = True)
                 if self.args.solo_loss:
                     self.solo_module_coarse.eval()
                     loss_ = self.solo_module_coarse(audio_cls, visual_cls, batch["img_id"])
@@ -581,6 +605,9 @@ class Trainer:
             cross_encoder.to(self.device)
         else:
             cross_encoder = None
+        # for name, param in dual_encoder.named_parameters():
+        #     if param.requires_grad:
+        #         print(name, param.data)
         return dual_encoder, cross_encoder, trainables, indices, libri_indices, optim_states
     def _setup_dataloader(self):
         if self.args.places:
