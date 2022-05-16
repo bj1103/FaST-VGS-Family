@@ -182,7 +182,7 @@ class DualEncoder(nn.Module):
         parser.add_argument("--layer_norm_eps", type=float, default=1e-12)
         parser.add_argument("--xtrm_layers", type=int, help="number of cross-modal layer", default=5)
         parser.add_argument("--trm_layers", type=int, help="number of visn layer (relational transformer)", default=5)
-        parser.add_argument("--visual_feat_dim", type=int, help="input visual feature dim (from faster rcnn)", default=2048)
+        parser.add_argument("--visual_feat_dim", type=int, help="input visual feature dim (from faster rcnn)", default=768)
         parser.add_argument("--visual_pos_dim", type=int, help="input visual positional embedding dim (originally the bounding boxes from faster rcnn)", default=4)
         parser.add_argument("--return_attention_weight", action="store_true", default=False, help="return the attention weight of the first layer of the first x_layer, i.e. audio attends to image feats [b,heads,T_audio,T_image]")
         parser.add_argument("--fine_matching_weight", type=float, default=1.0)
@@ -220,7 +220,7 @@ class DualEncoder(nn.Module):
         self.trm2 = BertLayer(args)
         self.trm2_proj = nn.Linear(self.args.hidden_size, self.args.hidden_size)
 
-        # self.visn_fc = VisualFeatEncoder(args)
+        self.visn_fc = VisualFeatEncoder(args)
         self.visual_cls_token = torch.nn.Parameter(torch.randn((1, 1, args.hidden_size)), requires_grad=True)
         self.trm = nn.ModuleList([BertLayer(args) for _ in range(args.trm_layers)])
         
@@ -231,6 +231,8 @@ class DualEncoder(nn.Module):
             nn.Linear(self.args.hidden_size*2, self.args.hidden_size)
         )
         # self.fc = nn.Sequential(nn.Linear(self.args.hidden_size*2, self.args.hidden_size), nn.GELU(), nn.Linear(self.args.hidden_size,1))        
+        self.weight_beit_layer = torch.nn.Parameter(torch.ones(len(args.beit_layer_use.split(','))), requires_grad=True)
+        self.softmax = nn.Softmax(dim=0)
         self.apply(self.init_weights)
 
     def init_weights(self, module):
@@ -254,6 +256,9 @@ class DualEncoder(nn.Module):
         # return outputs.last_hidden_state, cls_token_coarse
         
         # visual_feats = outputs.last_hidden_state
+        weight = self.softmax(self.weight_beit_layer)
+        visual_feats = torch.einsum('bmph,m->bph', visual_feats, weight)
+        visual_feats = self.visn_fc((visual_feats, None))
         visual_feats = torch.cat([self.visual_cls_token.repeat(visual_feats.shape[0],1,1), visual_feats], dim=1)
         for layer_module in self.trm:
             visual_feats = layer_module(visual_feats, None)

@@ -23,7 +23,7 @@ class ImageCaptionDataset(Dataset):
         parser.add_argument("--img_feat_len", type=int, help="num of img feats we will use", choices=list(range(1,37)), default=36)
         parser.add_argument("--audio_feat_len", type=float, help="maximal audio length", default=8)
         parser.add_argument("--val_audio_feat_len", type=float, help="maximal audio length", default=10.)
-
+        parser.add_argument("--beit_layer_use", type=str, help="Beit layers to use", default='7')
     def __init__(self, args, split = "train"):
         self.args = args
         self.split = split
@@ -46,7 +46,7 @@ class ImageCaptionDataset(Dataset):
         self.img_id2index = {}
         self.img_features = []
         self.feature_extractor = BeitFeatureExtractor.from_pretrained(self.args.beit_model)
-        self.feature_model = BeitModel.from_pretrained(self.args.beit_model).to(self.device)
+        self.feature_model = BeitModel.from_pretrained(self.args.beit_model, output_hidden_states=True).to(self.device)
         for index in tqdm(range(len(self.data))):
             img_id = self.data[index]['image']
             if self.img_id2index.get(img_id) == None:
@@ -56,11 +56,19 @@ class ImageCaptionDataset(Dataset):
         self.img_features = self.feature_extractor(images=self.img_features, return_tensors="pt")['pixel_values']
         self.img_embeddings = []
         self.feature_model.eval()
+        self.args.beit_layer_use = [for int(i) in self.args.beit_layer_use.split(',')]
         for i in tqdm(range(len(self.img_features))):
             inputs = self.img_features[i].unsqueeze(dim=0).to(self.device)
-            embed = self.feature_model(pixel_values=inputs).last_hidden_state
-            self.img_embeddings.append(embed.squeeze(dim=0).cpu().detach())
+            embed = self.feature_model(pixel_values=inputs).hidden_states[self.args.beit_layer_use]
+            embed_ = []
+            for e in embed:
+                e = e.squeeze(dim=0).cpu().detach()
+                embed_.append(e)
+            embed_ = torch.stack(embed_)
+            self.img_embeddings.append(embed_)
         print('img num : ', len(self.img_features))
+        del self.feature_model
+        del self.feature_extractor
         # for index in tqdm(range(len(self.data))):
         #     img_id = self.data[index]['image']
         #     img = np.asarray(Image.open(os.path.join(args.data_root, f'Images/{img_id}')))
