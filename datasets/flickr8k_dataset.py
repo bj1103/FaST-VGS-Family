@@ -56,13 +56,13 @@ class ImageCaptionDataset(Dataset):
         self.img_features = self.feature_extractor(images=self.img_features, return_tensors="pt")['pixel_values']
         self.img_embeddings = []
         self.feature_model.eval()
-        self.args.beit_layer_use = [for int(i) in self.args.beit_layer_use.split(',')]
+        beit_layers = [int(i) for i in self.args.beit_layer_use.split(',')]
         for i in tqdm(range(len(self.img_features))):
             inputs = self.img_features[i].unsqueeze(dim=0).to(self.device)
-            embed = self.feature_model(pixel_values=inputs).hidden_states[self.args.beit_layer_use]
+            embed = self.feature_model(pixel_values=inputs).hidden_states
             embed_ = []
-            for e in embed:
-                e = e.squeeze(dim=0).cpu().detach()
+            for j in beit_layers:
+                e = embed[j].squeeze(dim=0).cpu().detach()
                 embed_.append(e)
             embed_ = torch.stack(embed_)
             self.img_embeddings.append(embed_)
