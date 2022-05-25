@@ -587,7 +587,19 @@ class Trainer:
 
         if self.args.fb_w2v2_weights_fn and self.progress['num_updates'] <= 1 and not self.args.validate and self.args.trained_weights_dir == None:
             dual_encoder.conv1_trm1_trm3.carefully_load_state_dict(torch.load(self.args.fb_w2v2_weights_fn)['model'])
-
+        if self.args.pretrained_resnet and self.progress['num_updates'] <= 1 and not self.args.validate and self.args.trained_weights_dir == None:
+            logger.info('load resnet50')
+            state = torch.load(self.args.pretrained_resnet)["state_dict"]
+            for k in list(state.keys()):
+                if "encoder" in k:
+                    state[k.replace("encoder", "backbone")] = state[k]
+                    warnings.warn(
+                        "You are using an older checkpoint. Use a new one as some issues might arrise."
+                    )
+                if "backbone" in k:
+                    state[k.replace("backbone.", "")] = state[k]
+                del state[k]
+            dual_encoder.visn_encoder.load_state_dict(state, strict=False)
         if self.args.feature_grad_mult <= 0.:
             for name, p in dual_encoder.named_parameters():
                 if "feature_extractor" in name:

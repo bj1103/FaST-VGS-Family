@@ -12,6 +12,7 @@ from transformers import BeitFeatureExtractor, BeitModel
 from PIL import Image
 import glob
 from tqdm import tqdm
+from torchvision import transforms
 logger = logging.getLogger(__name__)
 
 
@@ -53,29 +54,24 @@ class ImageCaptionDataset(Dataset):
                 self.img_id2index[img_id] = len(self.img_features)
                 img = np.asarray(Image.open(os.path.join(args.data_root, f'Images/{img_id}')))
                 self.img_features.append(img)
-        self.img_features = self.feature_extractor(images=self.img_features, return_tensors="pt")['pixel_values']
-        self.img_embeddings = []
-        self.feature_model.eval()
-        beit_layers = [int(i) for i in self.args.beit_layer_use.split(',')]
-        for i in tqdm(range(len(self.img_features))):
-            inputs = self.img_features[i].unsqueeze(dim=0).to(self.device)
-            embed = self.feature_model(pixel_values=inputs).hidden_states
-            embed_ = []
-            for j in beit_layers:
-                e = embed[j].squeeze(dim=0).cpu().detach()
-                embed_.append(e)
-            embed_ = torch.stack(embed_)
-            self.img_embeddings.append(embed_)
-        print('img num : ', len(self.img_features))
-        del self.feature_model
-        del self.feature_extractor
-        # for index in tqdm(range(len(self.data))):
-        #     img_id = self.data[index]['image']
-        #     img = np.asarray(Image.open(os.path.join(args.data_root, f'Images/{img_id}')))
-        #     img_features = feature_extractor(images=img, return_tensors="pt")['pixel_values']
-        #     img = img_features.squeeze()
-        #     torch.save(img, os.path.join(args.data_root, f'processed_images/{img_id}'))
-        
+        if split == 'train':
+            self.transform = transforms.Compose(
+                [
+                    transforms.RandomResizedCrop(size=224, scale=(0.08, 1.0)),
+                    transforms.RandomHorizontalFlip(),
+                    transforms.ToTensor(),
+                    transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.228, 0.224, 0.225)),
+                ]
+            )
+        else:
+            self.transform = transforms.Compose(
+                [
+                    transforms.Resize(256),
+                    transforms.CenterCrop(224),
+                    transforms.ToTensor(),
+                    transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.228, 0.224, 0.225)),
+                ]
+            )
     def _LoadAudio(self, path):
         x, sr = sf.read(path, dtype = 'float32')
         assert sr == 16000
@@ -111,7 +107,8 @@ class ImageCaptionDataset(Dataset):
         wavpath = os.path.join(self.audio_base_path, "wavs", datum['wav'])
         audio, nframes = self._LoadAudio(wavpath)
         # mask_feats, boxes = self._LoadImage(img_index, ordered_indices)
-        img_feats = self.img_embeddings[img_index]
+        img_feats = self.img_features[img_index]
+        img_feats = self.transform(img_feats)
         return img_feats, audio, nframes, img_id, datum['wav']
 
     def __len__(self):
