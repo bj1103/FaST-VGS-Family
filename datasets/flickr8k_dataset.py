@@ -13,6 +13,7 @@ from PIL import Image
 import glob
 from tqdm import tqdm
 from torchvision import transforms
+from .transform_utils import ImagenetTransform
 logger = logging.getLogger(__name__)
 
 
@@ -55,14 +56,7 @@ class ImageCaptionDataset(Dataset):
                 img = np.asarray(Image.open(os.path.join(args.data_root, f'Images/{img_id}')))
                 self.img_features.append(img)
         if split == 'train':
-            self.transform = transforms.Compose(
-                [
-                    transforms.RandomResizedCrop(size=224, scale=(0.08, 1.0)),
-                    transforms.RandomHorizontalFlip(),
-                    transforms.ToTensor(),
-                    transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.228, 0.224, 0.225)),
-                ]
-            )
+            self.transform = ImagenetTransform(0.4, 0.4, 0.2, 0.1)
         else:
             self.transform = transforms.Compose(
                 [
