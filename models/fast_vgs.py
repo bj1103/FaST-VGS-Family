@@ -193,7 +193,7 @@ class DualEncoder(nn.Module):
         parser.add_argument("--fb_w2v2_weights_fn", type=str, help="the path of w2v2 small model trained by FAIR", default=None)
         parser.add_argument("--margin", type=float, default=1.0)
         parser.add_argument("--topk", type=float, default=100)
-        parser.add_argument("--pretrained_resnet", type=str, default=None)
+        parser.add_argument("--pretrained_resnet", type=str, default="/ssd/bj1103/resnet/resnet50.ckpt")
     def __init__(self, args):
         super().__init__()
         self.args = args
