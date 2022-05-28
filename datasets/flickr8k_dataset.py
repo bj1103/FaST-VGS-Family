@@ -46,14 +46,14 @@ class ImageCaptionDataset(Dataset):
         #     self.img_id2ordered_indices = pickle.load(f)
         self.img_id2index = {}
         self.img_features = []
-        self.feature_extractor = BeitFeatureExtractor.from_pretrained(self.args.beit_model)
-        self.feature_model = BeitModel.from_pretrained(self.args.beit_model, output_hidden_states=True).to(self.device)
         for index in tqdm(range(len(self.data))):
             img_id = self.data[index]['image']
             if self.img_id2index.get(img_id) == None:
                 self.img_id2index[img_id] = len(self.img_features)
-                img = np.asarray(Image.open(os.path.join(args.data_root, f'Images/{img_id}')))
-                self.img_features.append(img)
+                img = Image.open(os.path.join('/work/vjsalt22/dataset/flickr', f'Images/{img_id}'))
+                img_ = img.copy()
+                self.img_features.append(img_)
+                img.close()
         if split == 'train':
             self.transform = transforms.Compose(
                 [
