@@ -45,6 +45,7 @@ class Task_base():
 
 
 class zerospeech:
+    DATA_SOURCE_NAME = ["librispeech","synthetic"]
     @staticmethod
     def add_args(parser):
         parser.add_argument("--seed", type=int, default=1)
