@@ -7,7 +7,7 @@ import torch.nn.functional as F
 import torch.nn as nn
 from torch.utils.tensorboard import SummaryWriter
 import numpy as np
-from datasets import spokencoco_dataset, places_dataset, flickr8k_dataset, libri_dataset
+from datasets.zerospeech_dataset import ZerospeechDataset
 from datasets.sampler import StatefulSampler
 from steps.utils import *
 from steps.trainer_utils import *
@@ -96,78 +96,45 @@ class zerospeech:
         self.task_input_dir = args.task_input_dir
         self.task_name = args.task_name
         self.task_root_dir = os.path.join(args.output_result_dir, args.task_name)
-        print(self.task_root_dir)
         assert os.path.exists(self.task_root_dir)
         self.audio_wav_paths = {}
         
-        dev_libri_path_txt = os.path.join(self.task_input_dir,"dev_librispeech.txt")
-        dev_synthetic_path_txt = os.path.join(self.task_input_dir,"dev_synthetic.txt")
         os.makedirs(os.path.join(self.task_root_dir,"dev"),exist_ok=True)
         os.makedirs(os.path.join(self.task_root_dir,"dev","librispeech"),exist_ok=True)
         os.makedirs(os.path.join(self.task_root_dir,"dev","synthetic"),exist_ok=True)
         
-        with open(dev_libri_path_txt,"r") as f:
-            _data = [ os.path.join(self.task_input_dir,"dev","librispeech",x.strip())    for x in f.readlines() if x.strip().endswith(".wav")]
-            self.audio_wav_paths["dev_librispeech"] = _data
-
-        with open(dev_synthetic_path_txt,"r") as f:
-            _data = [os.path.join(self.task_input_dir,"dev","synthetic", x.strip()) for x in f.readlines() if x.strip().endswith(".wav")]
-            self.audio_wav_paths["dev_synthetic"] = _data
-    
     def run(self):
         self.dual_encoder.eval()
-        
         print(f"Inferencing zerospeech {self.task_name} dev")
-        for _split in self.DATA_SOURCE_NAME:
-            print("Datasource: {}, total:{}, bsz:{} ".format(
-                _split,
-                len(self.audio_wav_paths["{}_{}".format("dev",_split)]),
-                self.inference_bsz,
-                ceil(len(self.audio_wav_paths["{}_{}".format("dev",_split)]) / self.inference_bsz)
+        for data_source in self.DATA_SOURCE_NAME:
+            dataset = ZerospeechDataset(self.args, 'dev', data_source)
+            dataloader = torch.utils.data.DataLoader(
+                dataset, 
+                batch_size=self.args.val_batch_size, 
+                shuffle=False, 
+                num_workers=self.args.num_workers, 
+                pin_memory=True, 
+                collate_fn = dataset.collate
+            )
+            print("Datasource: {}, total:{}".format(
+                data_source,
+                len(dataset.__len__)
             ))
-            # _dataset = AudioDataset(
-            #     wav_paths=self.audio_wav_paths["{}_{}".format("dev",_split)],
-            #     sr=self.sample_rate
-            # )
-            # dev_dataloader = DataLoader(
-            #     dataset=_dataset,
-            #     batch_size=self.inference_bsz,
-            #     shuffle=False,
-            #     num_workers=8,
-            # )
 
-            for i in tqdm.tqdm(range(0,len(self.audio_wav_paths["{}_{}".format("dev",_split)])+self.inference_bsz,self.inference_bsz)):
-            # for _data,_wavpaths in tqdm.tqdm(dev_dataloader):
-                _wavpaths = self.audio_wav_paths["{}_{}".format("dev",_split)][i:i+self.inference_bsz+self.inference_bsz]
-                if len(_wavpaths) == 0 : continue
-                embeddings = []
+            for batch in dataloader:
                 with torch.no_grad():
-                    for _w in _wavpaths:
-                        x, sr = sf.read(path, dtype = 'float32')
-                        assert sr == 16000
-                        length_orig = len(x)
-                        if length_orig > 16000 * 8:
-                            audio_length = int(16000 * self.audio_feat_len)
-                            x = x[:audio_length]
-                            x_norm = (x - np.mean(x)) / np.std(x)
-                            x = torch.FloatTensor(x_norm) 
-                        else:
-                            # audio_length = length_orig
-                            # new_x = torch.zeros(int(16000 * self.audio_feat_len))
-                            x_norm = (x - np.mean(x)) / np.std(x)
-                            # new_x[:audio_length] = torch.FloatTensor(x_norm) 
-                            # x = new_x
-                            x = x_norm
-                        audio_attention_mask = torch.tensor([False for _ in len(x)])
-                        print(x.shape())
-                        print(audio_attention_mask.shape())
-                        embedding, _, _, _ = self.dual_encoder.forward_audio(x, audio_attention_mask, True, target_list=None)
-                        embeddings.append(embedding.cpu().float().numpy())
-                        print(embedding.shape())
-                        break
-                for _embs, _wavpath in zip(embeddings,_wavpaths):
-                    txt_path = os.path.join(self.task_root_dir,"dev",_split,os.path.basename(_wavpath).replace(".wav",".txt"))
-                    np.savetxt(txt_path,_embs)
+                    cur_batch = {
+                        "audio": batch['audio'].to(self.device),
+                        "audio_length": batch['audio_length']
+                        "audio_attention_mask": batch['audio_attention_mask'].to(self.device),
+                        "path": batch['path']
+                    }
+                    embeddings, _, _, _ = self.dual_encoder.forward_audio(cur_batch["audio"], cur_batch["audio_attention_mask"], True, target_list=None)
+                    embeddings = embedding.cpu().float().numpy()
+
+                for i, embed in enumerate(embeddings):
+                    txt_path = os.path.join(self.task_root_dir, "dev", data_source, os.path.basename(cur_batch['path'][i]).replace(".wav",".txt"))
+                    np.savetxt(txt_path, embed)
 
         print(f"Done inferencing zerospeech {self.task_name} dev")
     
@@ -298,15 +265,15 @@ class Task_semantic(Task_base):
         self.my_model.cuda()
         if self.run_dev:
             print(f"Inferencing zerospeech {self.task_name} dev")
-            for _split in self.DATA_SOURCE_NAME:
+            for data_source in self.DATA_SOURCE_NAME:
                 print("Datasource: {}, total:{}, bsz:{} ".format(
-                    _split,
-                    len(self.audio_wav_paths["{}_{}".format("dev",_split)]),
+                    data_source,
+                    len(self.audio_wav_paths["{}_{}".format("dev",data_source)]),
                     self.inference_bsz,
-                    ceil(len(self.audio_wav_paths["{}_{}".format("dev",_split)]) / self.inference_bsz)
+                    ceil(len(self.audio_wav_paths["{}_{}".format("dev",data_source)]) / self.inference_bsz)
                 ))
                 # _dataset = AudioDataset(
-                #     wav_paths=self.audio_wav_paths["{}_{}".format("dev",_split)],
+                #     wav_paths=self.audio_wav_paths["{}_{}".format("dev",data_source)],
                 #     sr=self.sample_rate
                 # )
                 # dev_dataloader = DataLoader(
@@ -316,9 +283,9 @@ class Task_semantic(Task_base):
                 #     num_workers=8,
                 # )
 
-                for i in tqdm.tqdm(range(0,len(self.audio_wav_paths["{}_{}".format("dev",_split)])+self.inference_bsz,self.inference_bsz)):
+                for i in tqdm.tqdm(range(0,len(self.audio_wav_paths["{}_{}".format("dev",data_source)])+self.inference_bsz,self.inference_bsz)):
                 # for _data,_wavpaths in tqdm.tqdm(dev_dataloader):
-                    _wavpaths = self.audio_wav_paths["{}_{}".format("dev",_split)][i:i+self.inference_bsz+self.inference_bsz]
+                    _wavpaths = self.audio_wav_paths["{}_{}".format("dev",data_source)][i:i+self.inference_bsz+self.inference_bsz]
                     if len(_wavpaths) == 0 : continue
                     _data = []
                     for _w in _wavpaths:
@@ -333,7 +300,7 @@ class Task_semantic(Task_base):
                     # print(embeddings.shape)
                     for _embs, _wavpath in zip(embeddings,_wavpaths):
                         # print("embs",_embs.shape)
-                        txt_path = os.path.join(self.task_root_dir,"dev",_split,os.path.basename(_wavpath).replace(".wav",".txt"))
+                        txt_path = os.path.join(self.task_root_dir,"dev",data_source,os.path.basename(_wavpath).replace(".wav",".txt"))
                         np.savetxt(txt_path,_embs)
 
             print(f"Done inferencing zerospeech {self.task_name} dev")
