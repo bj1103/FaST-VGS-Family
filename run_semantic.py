@@ -157,9 +157,12 @@ class zerospeech:
                             # x = new_x
                             x = x_norm
                         audio_attention_mask = torch.tensor([False for _ in len(x)])
+                        print(x.shape())
+                        print(audio_attention_mask.shape())
                         embedding, _, _, _ = self.dual_encoder.forward_audio(x, audio_attention_mask, True, target_list=None)
                         embeddings.append(embedding.cpu().float().numpy())
-
+                        print(embedding.shape())
+                        break
                 for _embs, _wavpath in zip(embeddings,_wavpaths):
                     txt_path = os.path.join(self.task_root_dir,"dev",_split,os.path.basename(_wavpath).replace(".wav",".txt"))
                     np.savetxt(txt_path,_embs)
