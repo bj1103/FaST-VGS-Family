@@ -125,7 +125,7 @@ class zerospeech:
                 with torch.no_grad():
                     cur_batch = {
                         "audio": batch['audio'].to(self.device),
-                        "audio_length": batch['audio_length']
+                        "audio_length": batch['audio_length'],
                         "audio_attention_mask": batch['audio_attention_mask'].to(self.device),
                         "path": batch['path']
                     }
