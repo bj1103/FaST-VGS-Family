@@ -95,6 +95,7 @@ class zerospeech:
         self.task_input_dir = args.task_input_dir
         self.task_name = args.task_name
         self.task_root_dir = os.path.join(args.output_result_dir, args.task_name)
+        print(self.task_root_dir)
         assert os.path.exists(self.task_root_dir)
         self.audio_wav_paths = {}
         
