@@ -28,6 +28,6 @@ python \
 --feature_grad_mult 0. \
 --layer_use 7 \
 --validate \
---task_input_dir /work/hsuanfu/dataset/zerospeech2021/semantic/ \
---output_result_dir /work/poheng/zerospeech2021 \
+--task_input_dir /work/vjsalt22/dataset/zerospeech2021/semantic/ \
+--output_result_dir /work/vjsalt22/poheng/zerospeech2021 \
 --task_name semantic
