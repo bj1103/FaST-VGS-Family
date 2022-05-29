@@ -336,6 +336,8 @@ class Task_semantic(Task_base):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument("--resume", action="store_true", dest="resume", help="load from exp_dir if True")
+    parser.add_argument("--validate", action="store_true", default=False, help="temp, if call trainer_variants rather than trainer")
     zerospeech.add_args(parser)
     w2v2_model.Wav2Vec2Model_cls.add_args(parser)
     fast_vgs.DualEncoder.add_args(parser)
