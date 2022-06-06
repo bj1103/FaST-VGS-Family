@@ -6,7 +6,7 @@
 data_root=/work/vjsalt22/poheng/flickr
 raw_audio_base_path=/work/vjsalt22/dataset/flickr/flickr_audio
 fb_w2v2_weights_fn=/work/vjsalt22/poheng/fb_w2v2/wav2vec_small.pt
-exp_dir=/work/vjsalt22/poheng/exp_2_flickr
+exp_dir=/work/vjsalt22/poheng/exp_3_flickr
 
 python3 \
 ../run_flickr8k.py \
@@ -30,3 +30,4 @@ python3 \
 --coarse_to_fine_retrieve \
 --feature_grad_mult 0. \
 --layer_use 7 \
+--solo_loss BarlowTwins

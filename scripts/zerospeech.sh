@@ -6,15 +6,15 @@ export CUDA_VISIBLE_DEVICES=0
 data_root=/work/vjsalt22/poheng/flickr
 raw_audio_base_path=/work/vjsalt22/dataset/flickr/flickr_audio
 fb_w2v2_weights_fn=/work/vjsalt22/poheng/fb_w2v2/wav2vec_small.pt
-exp_dir=/work/vjsalt22/poheng/best_InfoNCE_BT
+exp_dir=/work/vjsalt22/poheng/2nd_best_InfoNCE_BT
 
 python \
 ../run_semantic.py \
 --exp_dir ${exp_dir} \
 --num_workers 4 \
---batch_size 64 \
---val_batch_size 64 \
---val_cross_batch_size 128 \
+--batch_size 1 \
+--val_batch_size 1 \
+--val_cross_batch_size 1 \
 --n_epochs 250 \
 --n_print_steps 312 \
 --n_val_steps 624 \

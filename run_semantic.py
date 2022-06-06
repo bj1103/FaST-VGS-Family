@@ -68,7 +68,6 @@ class zerospeech:
         parser.add_argument("--std_coeff", type=float, default=25.0, help="Variance regularization loss coefficient for VICReg")
         parser.add_argument("--cov_coeff", type=float, default=1.0, help="Covariance regularization loss coefficient for VICReg")
         parser.add_argument("--lambd", type=float, default=0.0051, help="Weight on off-diagonal terms for barlow twins")
-        parser.add_argument("--task_input_dir", type=str)
         parser.add_argument("--output_result_dir", type=str)
         parser.add_argument("--task_name", type=str)
         
@@ -118,10 +117,10 @@ class zerospeech:
             )
             print("Datasource: {}, total:{}".format(
                 data_source,
-                len(dataset.__len__)
+                dataset.__len__()
             ))
 
-            for batch in dataloader:
+            for batch in tqdm(dataloader):
                 with torch.no_grad():
                     cur_batch = {
                         "audio": batch['audio'].to(self.device),
@@ -130,12 +129,11 @@ class zerospeech:
                         "path": batch['path']
                     }
                     embeddings, _, _, _ = self.dual_encoder.forward_audio(cur_batch["audio"], cur_batch["audio_attention_mask"], True, target_list=None)
-                    embeddings = embedding.cpu().float().numpy()
+                    embeddings = embeddings.cpu().float().numpy()
 
                 for i, embed in enumerate(embeddings):
                     txt_path = os.path.join(self.task_root_dir, "dev", data_source, os.path.basename(cur_batch['path'][i]).replace(".wav",".txt"))
                     np.savetxt(txt_path, embed)
-
         print(f"Done inferencing zerospeech {self.task_name} dev")
     
     def _setup_models(self):
@@ -310,6 +308,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--resume", action="store_true", dest="resume", help="load from exp_dir if True")
     parser.add_argument("--validate", action="store_true", default=False, help="temp, if call trainer_variants rather than trainer")
+    ZerospeechDataset.add_args(parser)
     zerospeech.add_args(parser)
     w2v2_model.Wav2Vec2Model_cls.add_args(parser)
     fast_vgs.DualEncoder.add_args(parser)

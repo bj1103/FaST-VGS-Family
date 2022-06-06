@@ -25,7 +25,7 @@ class ZerospeechDataset(Dataset):
         self.audio_feat_len = args.audio_feat_len if "train" in split else args.val_audio_feat_len
         self.path_txt =  os.path.join(self.args.task_input_dir, f"{split}_{data_source}.txt")
         
-        with open(path_txt, "r") as f:
+        with open(self.path_txt, "r") as f:
             data = [os.path.join(self.args.task_input_dir, split, data_source, x.strip()) for x in f.readlines() if x.strip().endswith(".wav")]
             self.audio_wav_paths = data
 
@@ -33,17 +33,19 @@ class ZerospeechDataset(Dataset):
         x, sr = sf.read(path, dtype = 'float32')
         assert sr == 16000
         length_orig = len(x)
-        if length_orig > 16000 * self.audio_feat_len:
-            audio_length = int(16000 * self.audio_feat_len)
-            x = x[:audio_length]
-            x_norm = (x - np.mean(x)) / np.std(x)
-            x = torch.FloatTensor(x_norm) 
-        else:
-            audio_length = length_orig
-            new_x = torch.zeros(int(16000 * self.audio_feat_len))
-            x_norm = (x - np.mean(x)) / np.std(x)
-            new_x[:audio_length] = torch.FloatTensor(x_norm) 
-            x = new_x        
+        #if length_orig > 16000 * self.audio_feat_len:
+        #    print('longer')
+        #    audio_length = int(16000 * self.audio_feat_len)
+        #    x = x[:audio_length]
+        #    x_norm = (x - np.mean(x)) / np.std(x)
+        #    x = torch.FloatTensor(x_norm) 
+        #else:
+        audio_length = length_orig
+        #    new_x = torch.zeros(int(16000 * self.audio_feat_len))
+        x_norm = (x - np.mean(x)) / np.std(x)
+        #    new_x[:audio_length] = torch.FloatTensor(x_norm) 
+        #    x = new_x
+        x = torch.FloatTensor(x_norm)
         return x, audio_length
 
     def __getitem__(self, index):
