@@ -128,7 +128,8 @@ class zerospeech:
                         "audio_attention_mask": batch['audio_attention_mask'].to(self.device),
                         "path": batch['path']
                     }
-                    embeddings, _, _, _ = self.dual_encoder.forward_audio(cur_batch["audio"], cur_batch["audio_attention_mask"], True, target_list=None)
+                    # embeddings, _, _, _ = self.dual_encoder.forward_audio(cur_batch["audio"], cur_batch["audio_attention_mask"], True, target_list=None)
+                    embeddings = self.dual_encoder.forward_zerospeech(cur_batch["audio"], cur_batch["audio_attention_mask"], True, target_list=None)
                     embeddings = embeddings.cpu().float().numpy()
 
                 for i, embed in enumerate(embeddings):

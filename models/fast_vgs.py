@@ -341,6 +341,21 @@ class DualEncoder(nn.Module):
         
         self.load_state_dict(new_states)
 
+    def forward_zerospeech(self, audio_feats, audio_attention_mask, test=False, target_list = None):
+        if test:
+            self.conv1_trm1_trm3.eval()
+            trm13_out = self.conv1_trm1_trm3(audio_feats, padding_mask=audio_attention_mask, mask=False, features_only=True, tgt_layer=self.args.layer_use)
+            losses = {}
+        else:
+            self.conv1_trm1_trm3.train()
+            if self.no_caption_audio_loss:
+                trm13_out = self.conv1_trm1_trm3(audio_feats, padding_mask=audio_attention_mask, mask=False, features_only=True, tgt_layer=self.args.layer_use)
+                losses = {}
+            else:
+                trm13_out = self.conv1_trm1_trm3(audio_feats, padding_mask=audio_attention_mask, mask=True)
+                losses = w2v2_loss(self.conv1_trm1_trm3, trm13_out, self.args, suffix="caption")
+        return trm13_out['layer_feats']
+    
 class CrossEncoder(nn.Module):
     def __init__(self, args):
         super().__init__()
