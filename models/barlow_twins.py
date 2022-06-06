@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+import torch.nn.functional as F
 from .utils import off_diagonal, Projector
 
 class BarlowTwins(nn.Module):
@@ -35,6 +36,12 @@ class BarlowTwins(nn.Module):
         z2 = z2[unique_index,]
         c = self.bn(z1).T @ self.bn(z2)
 
+        z1 = z1 - z1.mean(dim=0)
+        z2 = z2 - z2.mean(dim=0)
+        std_z1 = torch.sqrt(z1.var(dim=0) + 0.0001)
+        std_z2 = torch.sqrt(z2.var(dim=0) + 0.0001)
+        std_loss = torch.mean(F.relu(1 - std_z1)) / 2 + torch.mean(F.relu(1 - std_z2)) / 2
+
         # sum the cross-correlation matrix between all gpus
 
         c.div_(B)
@@ -43,4 +50,4 @@ class BarlowTwins(nn.Module):
         on_diag = torch.diagonal(c).add_(-1).pow_(2).sum()
         off_diag = off_diagonal(c).pow_(2).sum()
         # loss = on_diag + self.args.lambd * off_diag
-        return {'on_diag' : on_diag, 'off_diag' : off_diag}
+        return {'on_diag' : on_diag, 'off_diag' : off_diag, 'coarse_std_loss' : std_loss}

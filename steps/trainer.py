@@ -36,8 +36,10 @@ class Trainer:
         parser.add_argument("--projector_mlp", type=str, default="1536-1536", help="Size and number of layers of the MLP expander head")
         parser.add_argument("--same_projector", action="store_true", default=False, help="Same projector for audio and image")
         parser.add_argument("--sim_coeff", type=float, default=25.0, help="Invariance regularization loss coefficient for VICReg")
-        parser.add_argument("--std_coeff", type=float, default=25.0, help="Variance regularization loss coefficient for VICReg")
+        parser.add_argument("--std_coeff", type=float, default=1.0, help="Variance regularization loss coefficient for VICReg")
         parser.add_argument("--cov_coeff", type=float, default=1.0, help="Covariance regularization loss coefficient for VICReg")
+        parser.add_argument("--off_diag_weight", type=float, default=5.1e-05, help="Off diag coefficient for BT")
+        parser.add_argument("--on_diag_weight", type=float, default=0.001, help="On diag coefficient for BT")
         parser.add_argument("--lambd", type=float, default=0.0051, help="Weight on off-diagonal terms for barlow twins")
     
     def __init__(self, args):
@@ -657,7 +659,7 @@ class Trainer:
 
     def weight_loss(self, losses):
         if self.args.solo_loss:
-            weighted_loss = losses['coarse_sim_loss'] * self.args.sim_coeff + losses['coarse_std_loss'] * self.args.std_coeff + losses['coarse_cov_loss'] * self.args.cov_coeff
+            weighted_loss = losses['on_diag'] * self.args.on_diag_weight + losses['off_diag'] * self.args.off_diag_weight + losses['coarse_std_loss'] * self.args.std_coeff
             if self.args.fine_matching_weight != 0:
                 weighted_loss = losses['fine_sim_loss'] * self.args.sim_coeff + losses['fine_std_loss'] * self.args.std_coeff + losses['fine_cov_loss'] * self.args.cov_coeff
             if 'coarse_matching_loss' in losses:
