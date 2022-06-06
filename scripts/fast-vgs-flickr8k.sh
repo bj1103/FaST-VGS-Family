@@ -1,12 +1,12 @@
 #!/bin/sh
-# source ~/miniconda3/etc/profile.d/conda.sh
-# conda activate my_env
-# export CUDA_VISIBLE_DEVICES=0,1,2
+#source ~/miniconda3/etc/profile.d/conda.sh
+#conda activate my_env
+# export CUDA_VISIBLE_DEVICES=0
 
-data_root=/ssd/bj1103/flickr8k
-raw_audio_base_path=/ssd/bj1103/flickr_audio
-fb_w2v2_weights_fn=/ssd/bj1103/fb_w2v/wav2vec_small.pt
-exp_dir=/ssd/bj1103/exp_flickr
+data_root=/work/vjsalt22/poheng/flickr
+raw_audio_base_path=/work/vjsalt22/dataset/flickr/flickr_audio
+fb_w2v2_weights_fn=/work/vjsalt22/poheng/fb_w2v2/wav2vec_small.pt
+exp_dir=/work/vjsalt22/poheng/exp_2_flickr
 
 python3 \
 ../run_flickr8k.py \
@@ -15,12 +15,12 @@ python3 \
 --fb_w2v2_weights_fn ${fb_w2v2_weights_fn} \
 --exp_dir ${exp_dir} \
 --num_workers 4 \
---batch_size 32 \
---val_batch_size 32 \
---val_cross_batch_size 32 \
+--batch_size 64 \
+--val_batch_size 64 \
+--val_cross_batch_size 128 \
 --n_epochs 250 \
---n_print_steps 234 \
---n_val_steps 937 \
+--n_print_steps 312 \
+--n_val_steps 624 \
 --lr 0.0001 \
 --warmup_fraction 0.1 \
 --xtrm_layers 2 \
